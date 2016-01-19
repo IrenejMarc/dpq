@@ -32,6 +32,12 @@ struct SQLConnection
 		PQfinish(_connection);
 	}
 
+	void close()
+	{
+		PQfinish(_connection);
+		_connection = null;
+	}
+
 	@property const(string) db()
 	{
 		return PQdb(_connection).to!string;
