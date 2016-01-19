@@ -75,31 +75,29 @@ struct Connection
 		foreach(param; params)
 			values ~= Value(param);
 
+		return execParams(command, values);
+	}
+
+	Result execParams(string command, Value[] params)
+	{
 		const char* cStr = cast(const char*) command.toStringz;
 
-		import std.stdio;
-		writeln("nParams: ", values.length);
-		auto pTypes = values.paramTypes;
-		auto pValues = values.paramValues;
-		auto pLengths = values.paramLengths;
-		auto pFormats = values.paramFormats;
-
-		writeln("paramTypes: ", pTypes);
-		writeln("paramValues: ", pValues);
-		writeln("paramLengths: ", pLengths);
-		writeln("paramFormats: ", pFormats);
+		auto pTypes = params.paramTypes;
+		auto pValues = params.paramValues;
+		auto pLengths = params.paramLengths;
+		auto pFormats = params.paramFormats;
 
 		auto res = PQexecParams(
 				_connection, 
 				cStr, 
-				values.length.to!int, 
+				params.length.to!int, 
 				pTypes.ptr, 
 				pValues.ptr,
 				pLengths.ptr,
 				pFormats.ptr,
 				1);
 
-		return SQLResult(res);
+		return Result(res);
 	}
 
 	@property string errorMessage()
