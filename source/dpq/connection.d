@@ -25,6 +25,7 @@ struct Connection
 		}
 
 		_connection = PQconnectdb(connString.toStringz);
+		_dpqLastConnection = &this;
 	}
 
 	~this()
@@ -110,6 +111,8 @@ struct Connection
 	//PQstatus
 	//PQtransactionStatus
 }
+
+package Connection* _dpqLastConnection;
 
 shared static this()
 {
