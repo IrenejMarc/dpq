@@ -10,7 +10,7 @@ import std.string;
 import derelict.pq.pq;
 import std.conv : to;
 
-struct SQLConnection
+struct Connection
 {
 	private PGconn* _connection;
 
@@ -21,7 +21,7 @@ struct SQLConnection
 
 		if (err != null)
 		{
-			throw new SQLException(err.fromStringz.to!string);
+			throw new DPQException(err.fromStringz.to!string);
 		}
 
 		_connection = PQconnectdb(connString.toStringz);
@@ -62,17 +62,17 @@ struct SQLConnection
 		return PQport(_connection).to!string;
 	}
 
-	SQLResult exec(string command)
+	Result exec(string command)
 	{
 		PGresult* res = PQexec(_connection, cast(const char*)command.toStringz);
-		return SQLResult(res);
+		return Result(res);
 	}
 
-	SQLResult execParams(T...)(string command, T params)
+	Result execParams(T...)(string command, T params)
 	{
-		SQLValue[] values;
+		Value[] values;
 		foreach(param; params)
-			values ~= SQLValue(param);
+			values ~= Value(param);
 
 		const char* cStr = cast(const char*) command.toStringz;
 
