@@ -1,6 +1,6 @@
 module dpq.exception;
 
-class SQLException : Exception
+class DPQException : Exception
 {
 	this(const string msg)
 	{
