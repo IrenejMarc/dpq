@@ -4,7 +4,21 @@ import std.typecons;
 import dpq.connection;
 import dpq.querybuilder;
 import dpq.query;
+import dpq.attributes;
 
+@relation("users")
+struct User
+{
+	@serial @PrimaryKey int id;
+	@attr("user") string username;
+}
+
+@relation("articles")
+struct Article
+{
+	@PrimaryKey int id;
+	string title;
+}
 
 void main()
 {
@@ -58,4 +72,8 @@ void main()
 		writeln("row['txt'] is: ", row["txt"].as!string);
 
 	writeln("usecs taken for query: ", r.time.usecs);
+
+	writeln(relationName!User);
+
+	conn.ensureSchema!(User);
 }

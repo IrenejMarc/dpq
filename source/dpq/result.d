@@ -70,7 +70,11 @@ struct Result
 
 	int columnIndex(string col)
 	{
-		return PQfnumber(_result, cast(const char*)col.toStringz);
+		int index = PQfnumber(_result, cast(const char*)col.toStringz);
+		if (index == -1)
+			throw new DPQException("Column " ~ col ~ " was not found");
+
+		return index;
 	}
 
 	int opApply(int delegate(ref Row) dg)

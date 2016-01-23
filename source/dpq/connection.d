@@ -5,10 +5,12 @@ import derelict.pq.pq;
 import dpq.exception;
 import dpq.result;
 import dpq.value;
+import dpq.attributes;
 
 import std.string;
 import derelict.pq.pq;
 import std.conv : to;
+import std.traits;
 
 struct Connection
 {
@@ -105,9 +107,78 @@ struct Connection
 		return PQerrorMessage(_connection).to!string;
 	}
 
-	//PQoptions
-	//PQstatus
-	//PQtransactionStatus
+	void ensureSchema(T...)()
+	{
+		import std.stdio;
+		foreach (type; T)
+		{
+			enum name = relationName!(type);
+			string str = "CREATE TABLE IF NOT EXISTS \"" ~ name ~ "\" (%s)";
+
+			string cols;
+			foreach(m; __traits(allMembers, type))
+			{
+				cols ~= "\"" ~ attributeName!(mixin("type." ~ m)) ~ "\"";
+
+				alias t = typeof(mixin("type." ~ m));
+				writeln("Type: ", typeid(t));
+
+				cols ~= " ";
+
+				// TODO: More types, embedded structs, Date types
+
+				// Basic data types
+				static if (hasUDA!(mixin("type." ~ m), PGTypeAttribute))
+					cols ~= getUDAs!(mixin("type." ~ m), PGTypeAttribute)[0].type;
+				else
+				{
+					alias tu = Unqual!(typeof(mixin("type." ~ m)));
+
+					static if (is(tu == int))
+						cols ~= "INT";
+					else static if (is(tu == long))
+						cols ~= "BIGINT";
+					else static if (is(tu == float))
+						cols ~= "FLOAT4";
+					else static if (is(tu == double))
+						cols ~= "FLOAT8";
+					else static if (is(tu == char[]) || is(tu == string))
+						cols ~= "TEXT";
+					else static if (is(tu == bool))
+						cols ~= "BOOL";
+					else static if (is(tu == char))
+						cols ~= "CHAR(1)";
+					else static if(is(tu == ubyte[]) || is(tu == byte[]))
+						cols ~= "BYTEA";
+					// Default to bytea because we fetch and send everything in binary anyway
+					else
+						static assert(false, "Cannot map type \"" ~ t.stringof ~ "\" of field " ~ m ~ " to any PG type, please specify it manually using @type.");
+				}
+				
+
+
+				static if (hasUDA!(mixin("type." ~ m), PrimaryKeyAttribute))
+					cols ~= " PRIMARY KEY";
+
+
+				cols ~= ", ";
+			}
+
+			cols = cols[0 .. $ - 2];
+			str = str.format(cols);
+
+
+
+
+			std.stdio.writeln(str);
+			//exec(str);
+		}
+	}
+
+	T find(T, U)(U id)
+	{
+
+	}
 }
 
 package Connection* _dpqLastConnection;
