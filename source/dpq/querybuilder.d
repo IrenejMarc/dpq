@@ -73,7 +73,7 @@ struct QueryBuilder
 		if (_columns.length == 0)
 			cols = "*";
 		else
-			cols = _columns.join("\",\"");
+			cols = "\"" ~ _columns.join("\", \"") ~ "\"";
 
 		string str = "SELECT %s FROM \"%s\"".format(cols, _from);
 
