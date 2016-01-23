@@ -11,6 +11,7 @@ import std.string;
 import derelict.pq.pq;
 import std.conv : to;
 import std.traits;
+import std.typecons : Nullable;
 
 struct Connection
 {
@@ -118,12 +119,11 @@ struct Connection
 			string str = "CREATE TABLE IF NOT EXISTS \"" ~ name ~ "\" (%s)";
 
 			string cols;
-			foreach(m; __traits(allMembers, type))
+			foreach(m; serialisableMembers!type)
 			{
 				cols ~= "\"" ~ attributeName!(mixin("type." ~ m)) ~ "\"";
 
 				alias t = typeof(mixin("type." ~ m));
-				writeln("Type: ", typeid(t));
 
 				cols ~= " ";
 
@@ -159,9 +159,9 @@ struct Connection
 				
 
 
+				// TODO: Foreign keys, indexes, constraints
 				static if (hasUDA!(mixin("type." ~ m), PrimaryKeyAttribute))
 					cols ~= " PRIMARY KEY";
-
 
 				cols ~= ", ";
 			}
@@ -169,11 +169,7 @@ struct Connection
 			cols = cols[0 .. $ - 2];
 			str = str.format(cols);
 
-
-
-
-			std.stdio.writeln(str);
-			//exec(str);
+			exec(str);
 		}
 	}
 
