@@ -27,6 +27,12 @@ struct Query
 		_command = command;
 	}
 
+	this(ref Connection conn, string command, Value[] params)
+	{
+		this(conn, command);
+		_params = params;
+	}
+
 	@property void connection(ref Connection conn)
 	{
 		_connection = &conn;
