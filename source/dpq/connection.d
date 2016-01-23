@@ -177,9 +177,46 @@ struct Connection
 		}
 	}
 
-	T find(T, U)(U id)
+	Nullable!T find(T, U)(U id)
 	{
+		return find!T(primaryKeyName!T, id);
+	}
 
+	Nullable!T find(T, U)(string col, U val)
+	{
+		import dpq.querybuilder;
+		import std.stdio;
+
+		string[] members;
+		foreach (m; serialisableMembers!T)
+			members ~= attributeName!(mixin("T." ~ m));
+
+		QueryBuilder qb;
+		qb.select(members)
+			.from(relationName!T)
+			.where(col ~ " = {col_" ~ col ~ "}");
+
+		qb["col_" ~ col] = val;
+
+		auto q = qb.query(this);
+
+		auto r = q.run();
+		if (r.rows == 0)
+			return Nullable!T.init;
+
+		//return T();
+		
+		T res;
+		foreach (m; serialisableMembers!T)
+		{
+			enum n = attributeName!(mixin("T." ~ m));
+			try
+			{
+				mixin("res." ~ m) = r[0][n].as!(typeof(mixin("res." ~ m)));
+			}
+			catch {}
+		}
+		return Nullable!T(res);
 	}
 }
 
