@@ -6,6 +6,8 @@ import dpq.query;
 import std.typecons;
 import std.string;
 
+import dpq.connection;
+
 enum Order : string
 {
 	asc = "ASC",
@@ -35,6 +37,11 @@ struct QueryBuilder
 		_params[key] = val;
 	}
 
+	ref QueryBuilder select(string[] cols...)
+	{
+		_columns = cols;
+		return this;
+	}
 
 	ref QueryBuilder from(string from)
 	{
