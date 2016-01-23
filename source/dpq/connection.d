@@ -30,6 +30,8 @@ struct Connection
 		_dpqLastConnection = &this;
 	}
 
+	@disable this(this);
+
 	~this()
 	{
 		PQfinish(_connection);
