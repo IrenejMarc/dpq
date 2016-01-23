@@ -100,9 +100,24 @@ struct QueryBuilder
 		return str;
 	}
 
-	@property Query query()
+	@property private Value[] paramsArr()
+	{
+		Value[] res;
+		foreach (param, val; _params)
+			res ~= val;
+
+		std.stdio.writeln(res);
+		return res;
+	}
+
+	Query query()
 	{
 		return Query(command());
+	}
+
+	Query query(ref Connection conn)
+	{
+		return Query(conn, command, paramsArr);
 	}
 	
 }
