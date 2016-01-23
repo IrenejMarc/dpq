@@ -12,7 +12,7 @@ struct Query
 	private Value[] _params;
 	private Connection* _connection;
 
-	this(ref Connection connection, string command)
+	this(ref Connection connection, string command = "")
 	{
 		_connection = &connection;
 		_command = command;
