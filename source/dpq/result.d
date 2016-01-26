@@ -97,7 +97,7 @@ struct Result
 	}
 }
 
-private struct Row
+package struct Row
 {
 	private int _row;
 	private Result* _parent;
