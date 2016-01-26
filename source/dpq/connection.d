@@ -6,6 +6,7 @@ import dpq.exception;
 import dpq.result;
 import dpq.value;
 import dpq.attributes;
+import dpq.querybuilder;
 
 import std.string;
 import derelict.pq.pq;
@@ -173,24 +174,21 @@ struct Connection
 		}
 	}
 
-	Nullable!T find(T, U)(U id)
+	Nullable!T findOne(T, U)(U id)
 	{
-		return find!T(primaryKeyName!T, id);
+		return findOneBy!T(primaryKeyName!T, id);
 	}
 
-	Nullable!T find(T, U)(string col, U val)
+	Nullable!T findOneBy(T, U)(string col, U val)
 	{
-		import dpq.querybuilder;
 		import std.stdio;
 
-		string[] members;
-		foreach (m; serialisableMembers!T)
-			members ~= attributeName!(mixin("T." ~ m));
+		auto members = sqlMembers!T;
 
 		QueryBuilder qb;
 		qb.select(members)
 			.from(relationName!T)
-			.where(col ~ " = {col_" ~ col ~ "}");
+			.where("\"" ~ col ~ "\"" ~ " = {col_" ~ col ~ "}");
 
 		qb["col_" ~ col] = val;
 
@@ -202,18 +200,50 @@ struct Connection
 
 		//return T();
 		
-		T res;
-		foreach (m; serialisableMembers!T)
-		{
-			enum n = attributeName!(mixin("T." ~ m));
-			try
-			{
-				mixin("res." ~ m) = r[0][n].as!(typeof(mixin("res." ~ m)));
-			}
-			catch {}
-		}
+		auto res = deserialise!T(r[0]);
 		return Nullable!T(res);
 	}
+	
+	Nullable!T findOne(T, U...)(string filter, U vals)
+	{
+		QueryBuilder qb;
+		qb.select(sqlMembers!T)
+			.from(relationName!T)
+			.where(filter);
+
+		auto q = qb.query(this);
+		auto r = q.run(vals);
+
+		if (r.rows == 0)
+			return Nullable!T.init;
+
+		auto res = deserialise!T(r[0]);
+		return Nullable!T(res);
+	}
+}
+
+private string[] sqlMembers(T)()
+{
+	string[] members;
+	foreach (m; serialisableMembers!T)
+		members ~= attributeName!(mixin("T." ~ m));
+
+	return members;
+}
+
+private T deserialise(T)(Row r)
+{
+	T res;
+	foreach (m; serialisableMembers!T)
+	{
+		enum n = attributeName!(mixin("T." ~ m));
+		try
+		{
+			mixin("res." ~ m) = r[n].as!(typeof(mixin("res." ~ m)));
+		}
+		catch {}
+	}
+	return res;
 }
 
 package Connection* _dpqLastConnection;
