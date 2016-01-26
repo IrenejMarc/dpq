@@ -30,6 +30,12 @@ struct QueryBuilder
 		Value[string] _params;
 
 		int _paramIndex = 1;
+		Connection* _connection;
+	}
+
+	this(ref Connection connection)
+	{
+		_connection = &connection;
 	}
 
 	void opIndexAssign(T)(T val, string key)
@@ -119,6 +125,9 @@ struct QueryBuilder
 
 	Query query()
 	{
+		if (_connection != null)
+			return Query(command, *_connection);
+
 		return Query(command());
 	}
 
