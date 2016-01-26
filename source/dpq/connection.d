@@ -14,10 +14,28 @@ import std.conv : to;
 import std.traits;
 import std.typecons;
 
+/**
+	Represents the PostgreSQL connection and allows executing queries on it.
+
+	Examples:
+	-------------
+	auto conn = Connection("host=localhost dbname=testdb user=testuer");
+	//conn.exec ...
+	-------------
+*/
 struct Connection
 {
 	private PGconn* _connection;
 
+	/**
+		Connection constructor
+
+		Params:
+			- connString - connection string
+
+		See also:
+			http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-CONNSTRING
+	*/
 	this(string connString)
 	{
 		char* err;
@@ -32,49 +50,91 @@ struct Connection
 		_dpqLastConnection = &this;
 	}
 
+	/** Copy constructor is disabled to avoid double-freeing the PGConn pointer */
 	@disable this(this);
 
+	/** The destructor will automatically close the connection and free resources */
 	~this()
 	{
 		PQfinish(_connection);
 	}
 
+	/** 
+		Close the connection manually 
+	*/
 	void close()
 	{
 		PQfinish(_connection);
 		_connection = null;
 	}
 
+	/** Returns the name of the database currently selected */
 	@property const(string) db()
 	{
 		return PQdb(_connection).to!string;
 	}
 
+	/** Returns the name of the current user */
 	@property const(string) user()
 	{
 		return PQuser(_connection).to!string;
 	}
 
+	/// ditto, but password
 	@property const(string) password()
 	{
 		return PQpass(_connection).to!string;
 	}
 
+	/// ditto, but host
 	@property const(string) host()
 	{
 		return PQhost(_connection).to!string;
 	}
+
+	/// ditto, but port
 	@property const(string) port()
 	{
 		return PQport(_connection).to!string;
 	}
 
+	/**
+		Executes the given string directly
+
+		Throws on fatal query errors like bad syntax
+
+		Examples:
+		----------------
+		Connection conn; // An established connection
+
+		conn.exec("CREATE TABLE IF NOT EXISTS test_table");
+		----------------
+	*/
 	Result exec(string command)
 	{
 		PGresult* res = PQexec(_connection, cast(const char*)command.toStringz);
 		return Result(res);
 	}
 
+	/**
+		Executes the given string with given params
+
+		Params should be given as $1, $2, ... $n in the actual command.
+		All params are sent in a binary format and should not be escaped.
+		If a param's type cannot be inferred, this method will throw an exception,
+		in this case, either specify the type using the :: (cast) notation or
+		make sure the type can be inferred by PostgreSQL in your query.
+
+		Examples:
+		----------------
+		Connection conn; // An established connection
+
+		conn.execParams("SELECT $1::string, $2::int, $3::double");
+		----------------
+
+		See also:
+			http://www.postgresql.org/docs/9.3/static/libpq-exec.html
+	*/
 	Result execParams(T...)(string command, T params)
 	{
 		Value[] values;
@@ -84,6 +144,7 @@ struct Connection
 		return execParams(command, values);
 	}
 
+	/// ditto, but taking an array of params, instead of variadic template
 	Result execParams(string command, Value[] params)
 	{
 		const char* cStr = cast(const char*) command.toStringz;
@@ -106,11 +167,45 @@ struct Connection
 		return Result(res);
 	}
 
+	/**
+		Returns the last error message
+
+		Examples:
+		--------------------
+		Connection conn; // An established connection
+
+		writeln(conn.errorMessage);
+		--------------------
+		
+	 */
 	@property string errorMessage()
 	{
 		return PQerrorMessage(_connection).to!string;
 	}
 
+	/**
+		Generates and runs the DDL from the givent structures
+
+		Attributes from dpq.attributes should be used to define
+		primary keys, indexes, and relationships.
+
+		A custom type can be specified with the @type attribute.
+
+		Examples:
+		-----------------------
+		Connection conn; // An established connection
+		struct User 
+		{
+			@serial8 @PKey long id;
+			string username;
+			ubyte[] passwordHash;
+		};
+
+		struct Article { ... };
+
+		conn.ensureSchema!(User, Article);
+		-----------------------
+	*/
 	void ensureSchema(T...)()
 	{
 		import std.stdio;
@@ -174,11 +269,47 @@ struct Connection
 		}
 	}
 
+	/**
+		Returns the requested structure or a Nullable null value if no rows are returned
+
+		This method queries for the given structure by its primary key. If no
+		primary key can be found, a compile-time error will be generated.
+
+		Examples:
+		----------------------
+		Connection conn; // An established connection
+		struct User
+		{
+			@serial @PKey int id;
+			...
+		};
+
+		auto user = conn.findOne!User(1); // will search by the id attribute
+		----------------------
+	*/
 	Nullable!T findOne(T, U)(U id)
 	{
 		return findOneBy!T(primaryKeyName!T, id);
 	}
 
+	/**
+		Returns the requestes structure, searches by the given column name
+		with the given value
+
+		If not rows are returned, a Nullable null value is returned
+
+		Examples:
+		----------------------
+		Connection conn; // An established connection
+		struct User
+		{
+			@serial @PKey int id;
+			...
+		};
+
+		auto user = conn.findOneBy!User("id", 1); // will search by "id"
+		----------------------
+	*/
 	Nullable!T findOneBy(T, U)(string col, U val)
 	{
 		import std.stdio;
@@ -205,6 +336,33 @@ struct Connection
 		return Nullable!T(res);
 	}
 	
+	/**
+		Returns the requested structure, searches by the specified filter
+		with given params
+
+		The filter is not further escaped, so programmer needs to make sure
+		not to properly escape or enclose reserved keywords (like user -> "user")
+		so PostgreSQL can understand them.
+
+		If not rows are returned, a Nullable null value is returned
+
+		Examples:
+		----------------------
+		Connection conn; // An established connection
+		struct User
+		{
+			@serial @PKey int id;
+			string username;
+			int posts;
+		};
+
+		auto user = conn.findOne!User("username = $1 OR posts > $2", "foo", 42);
+		if (!user.isNull)
+		{
+			... // do something
+		}
+		----------------------
+	*/
 	Nullable!T findOne(T, U...)(string filter, U vals)
 	{
 		QueryBuilder qb;
@@ -223,6 +381,29 @@ struct Connection
 		return Nullable!T(res);
 	}
 
+	/**
+		Returns an array of the specified type, filtered with the given filter and
+		params
+
+		If no rows are returned by PostgreSQL, an empty array is returned.
+
+		Examples:
+		----------------------
+		Connection conn; // An established connection
+		struct User
+		{
+			@serial @PKey int id;
+			string username;
+			int posts;
+		};
+
+		auto users = conn.find!User("username = $1 OR posts > $2", "foo", 42);
+		foreach (u; users)
+		{
+			... // do something
+		}
+		----------------------
+	*/
 	T[] find(T, U...)(string filter = "", U vals = U.init)
 	{
 		QueryBuilder qb;
@@ -240,6 +421,10 @@ struct Connection
 	}
 }
 
+/**
+	Returns an array of all the members that can be (de-)serialised, with their
+	preferred names.
+*/
 private string[] sqlMembers(T)()
 {
 	string[] members;
@@ -249,7 +434,14 @@ private string[] sqlMembers(T)()
 	return members;
 }
 
-private T deserialise(T)(Row r)
+/**
+	Deserialises the given Row to the requested type
+
+	Params:
+		- T (template) - type to deserialise into
+		- r - Row to deserialise
+*/
+T deserialise(T)(Row r)
 {
 	T res;
 	foreach (m; serialisableMembers!T)
@@ -264,8 +456,10 @@ private T deserialise(T)(Row r)
 	return res;
 }
 
+/// Hold the last created connection, not to be used outside the library
 package Connection* _dpqLastConnection;
 
+/// Loads the derelict-pq library at runtime
 shared static this()
 {
 	DerelictPQ.load();
