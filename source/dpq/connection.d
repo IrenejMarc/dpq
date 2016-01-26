@@ -188,7 +188,8 @@ struct Connection
 		QueryBuilder qb;
 		qb.select(members)
 			.from(relationName!T)
-			.where("\"" ~ col ~ "\"" ~ " = {col_" ~ col ~ "}");
+			.where("\"" ~ col ~ "\"" ~ " = {col_" ~ col ~ "}")
+			.limit(1);
 
 		qb["col_" ~ col] = val;
 
@@ -209,7 +210,8 @@ struct Connection
 		QueryBuilder qb;
 		qb.select(sqlMembers!T)
 			.from(relationName!T)
-			.where(filter);
+			.where(filter)
+			.limit(1);
 
 		auto q = qb.query(this);
 		auto r = q.run(vals);
