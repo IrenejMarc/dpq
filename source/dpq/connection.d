@@ -12,7 +12,7 @@ import std.string;
 import derelict.pq.pq;
 import std.conv : to;
 import std.traits;
-import std.typecons : Nullable;
+import std.typecons;
 
 struct Connection
 {
@@ -221,6 +221,22 @@ struct Connection
 
 		auto res = deserialise!T(r[0]);
 		return Nullable!T(res);
+	}
+
+	T[] find(T, U...)(string filter = "", U vals = U.init)
+	{
+		QueryBuilder qb;
+		qb.select(sqlMembers!T)
+			.from(relationName!T)
+			.where(filter);
+
+		auto q = qb.query(this);
+
+		T[] res;
+		foreach (r; q.run(vals))
+			res ~= deserialise!T(r);
+
+		return res;
 	}
 }
 
