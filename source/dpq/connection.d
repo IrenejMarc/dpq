@@ -209,6 +209,8 @@ struct Connection
 	void ensureSchema(T...)()
 	{
 		import std.stdio;
+		string[] additional;
+
 		foreach (type; T)
 		{
 			enum name = relationName!(type);
@@ -217,7 +219,8 @@ struct Connection
 			string cols;
 			foreach(m; serialisableMembers!type)
 			{
-				cols ~= "\"" ~ attributeName!(mixin("type." ~ m)) ~ "\"";
+				string colName = attributeName!(mixin("type." ~ m));
+				cols ~= "\"" ~ colName ~ "\"";
 
 				alias t = typeof(mixin("type." ~ m));
 
@@ -253,11 +256,52 @@ struct Connection
 						static assert(false, "Cannot map type \"" ~ t.stringof ~ "\" of field " ~ m ~ " to any PG type, please specify it manually using @type.");
 				}
 				
-
-
-				// TODO: Foreign keys, indexes, constraints
+				writeln("All attrs: ", __traits(getAttributes, mixin("type." ~ m)));
+				writeln("Has FK UDA: ", hasUDA!(mixin("type." ~ m), ForeignKeyAttribute));
+				writeln("FK UDAs: ", getUDAs!(mixin("type." ~ m), ForeignKeyAttribute));
+				writeln("Has index UDA: ", hasUDA!(mixin("type." ~ m), IndexAttribute));
+				writeln("index UDAs: ", getUDAs!(mixin("type." ~ m), IndexAttribute));
+								
+				// Primary key
 				static if (hasUDA!(mixin("type." ~ m), PrimaryKeyAttribute))
 					cols ~= " PRIMARY KEY";
+				// Index
+				else static if (hasUDA!(mixin("type." ~ m), IndexAttribute))
+				{
+					writeln("Got Index!");
+					enum uda = getUDAs!(mixin("type." ~ m), IndexAttribute)[0];
+					additional ~= "CREATE%sINDEX \"%s\" ON \"%s\" (\"%s\")".format(
+							uda.unique ? " UNIQUE " : " ",
+							"%s_%s_index".format(name, colName),
+							name,
+							colName);
+
+					// DEBUG
+					writeln(additional[$ - 1]);
+				}
+				// Foreign key
+				else static if (hasUDA!(mixin("type." ~ m), ForeignKeyAttribute))
+				{
+					writeln("Got FK");
+//ALTER TABLE distributors ADD CONSTRAINT distfk FOREIGN KEY (address) REFERENCES addresses (address) MATCH FULL;
+					enum uda = getUDAs!(mixin("type." ~ m), ForeignKeyAttribute)[0];
+					additional ~= 
+						"ALTER TABLE \"%s\" ADD CONSTRAINT \"%s\" FOREIGN KEY (\"%s\") REFERENCES \"%s\" (\"%s\")".format(
+								name,
+								"%s_%s_fk_%s".format(name, colName, uda.relation),
+								colName,
+								uda.relation,
+								uda.pkey);
+
+					// Create an index on the FK too
+					additional ~= "CREATE INDEX \"%s\" ON \"%s\" (\"%s\")".format(
+							"%s_%s_fk_index".format(name, colName),
+							name,
+							colName);
+
+					// DEBUG
+					writeln(additional[$ - 2 .. $]);
+				}
 
 				cols ~= ", ";
 			}
@@ -267,6 +311,8 @@ struct Connection
 
 			exec(str);
 		}
+		foreach (cmd; additional)
+			exec(cmd);
 	}
 
 	/**
