@@ -126,7 +126,7 @@ struct QueryBuilder
 	Query query()
 	{
 		if (_connection != null)
-			return Query(command, *_connection);
+			return Query(*_connection, command());
 
 		return Query(command());
 	}
