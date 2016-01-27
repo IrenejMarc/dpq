@@ -30,6 +30,7 @@ struct AttributeAttribute
 }
 
 alias PKey = PrimaryKey;
+alias PK = PrimaryKey;
 
 struct PrimaryKeyAttribute
 {
@@ -70,6 +71,34 @@ struct IgnoreAttribute
 {
 	return IgnoreAttribute();
 }
+
+struct IndexAttribute
+{
+	bool unique = false;
+}
+
+@property IndexAttribute index()
+{
+	return IndexAttribute();
+}
+
+@property IndexAttribute uniqueIndex()
+{
+	return IndexAttribute(true);
+}
+
+struct ForeignKeyAttribute
+{
+	string relation;
+	string pkey;
+}
+
+@property ForeignKeyAttribute foreignKey(T)()
+{
+	return ForeignKeyAttribute(relationName!T, primaryKeyName!T);
+}
+alias FK = foreignKey;
+alias FKey = foreignKey;
 
 template relationName(alias R)
 {
