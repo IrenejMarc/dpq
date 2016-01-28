@@ -130,6 +130,28 @@ template primaryKeyName(T)
 	enum primaryKeyName = fields[0].stringof;
 }
 
+template isPK(alias T, string m)
+{
+	enum isPK = hasUDA!(mixin("T." ~ m), PrimaryKeyAttribute);
+}
+
+string[] attributeList(T)(bool ignorePK = false)
+{
+	alias TU = Unqual!T;
+	pragma(msg, TU);
+	string[] res;
+	foreach(m; serialisableMembers!T)
+	{
+		if (ignorePK && isPK!(TU, m))
+			continue;
+
+		res ~= attributeName!(mixin("T." ~ m));
+	}
+
+	return res;
+}
+alias sqlMembers = attributeList;
+
 template serialisableMembers(T)
 {
 	alias serialisableMembers = filterSerialisableMembers!(T, __traits(allMembers, T));
