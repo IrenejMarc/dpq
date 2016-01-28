@@ -184,7 +184,7 @@ struct Connection
 	}
 
 	/**
-		Generates and runs the DDL from the givent structures
+		Generates and runs the DDL from the given structures
 
 		Attributes from dpq.attributes should be used to define
 		primary keys, indexes, and relationships.
