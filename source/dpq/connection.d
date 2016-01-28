@@ -95,7 +95,7 @@ struct Connection
 	/// ditto, but port
 	@property const(ushort) port()
 	{
-		return PQport(_connection).to!ushort;
+		return PQport(_connection).fromStringz.to!ushort;
 	}
 
 	/**
@@ -483,20 +483,24 @@ struct Connection
 		auto r = qb.query(this).run();
 		return r.rows;
 	}
+
+	bool insert(T)(T val)
+	{
+		QueryBuilder qb;
+		qb.insert(relationName!T, attributeList!T(true));
+		foreach (m; __traits(allMembers, T))
+		{
+			static if (isPK!(T, m))
+				continue;
+			else
+				qb.addValue(__traits(getMember, val, m));
+		}
+
+		auto r = qb.query(this).run();
+		return r.rows > 0;
+	}
 }
 
-/**
-	Returns an array of all the members that can be (de-)serialised, with their
-	preferred names.
-*/
-private string[] sqlMembers(T)()
-{
-	string[] members;
-	foreach (m; serialisableMembers!T)
-		members ~= attributeName!(mixin("T." ~ m));
-
-	return members;
-}
 
 /**
 	Deserialises the given Row to the requested type
