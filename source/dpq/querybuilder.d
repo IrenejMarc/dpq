@@ -2,11 +2,11 @@ module dpq.querybuilder;
 
 import dpq.value;
 import dpq.query;
+import dpq.connection;
 
 import std.typecons;
 import std.string;
 
-import dpq.connection;
 
 enum Order : string
 {
@@ -23,8 +23,6 @@ private enum QueryType
 
 struct QueryBuilder
 {
-	// SELECT 'a', 'b' FROM table_name WHERE id = 1 ORDER BY id DESC LIMIT 10 OFFSET 5 
-
 	private
 	{
 		string[] _columns;
@@ -141,6 +139,41 @@ struct QueryBuilder
 
 		return this;
 	}
+	
+	// INSERT methods
+	ref QueryBuilder insert(string table, string[] cols...)
+	{
+		_table = table;
+		_columns = cols;
+		_type = QueryType.insert;
+		return this;
+	}
+
+	ref QueryBuilder values(T...)(T vals)
+	{
+		assert(_type == QueryType.insert, "QueryBuilder.values() can only be used on INSERT queries");
+
+		foreach (val; vals)
+			addValue(val);
+
+		return this;
+	}
+
+	ref QueryBuilder values(Value[] vals)
+	{
+		assert(_type == QueryType.insert, "QueryBuilder.values() can only be used on INSERT queries");
+
+		foreach (val; vals)
+			addValue(val);
+
+		return this;
+	}
+
+	ref QueryBuilder addValue(T)(T val)
+	{
+		_indexParams ~= Value(val);
+		return this;
+	}
 
 	// Other stuff
 
@@ -184,6 +217,18 @@ struct QueryBuilder
 		return replaceParams(str);
 	}
 
+	private string insertCommand()
+	{
+		int index = 0;
+		string str = "INSERT INTO \"%s\" (\"%s\") VALUES (%s)".format(
+				_table,
+				_columns.join("\",\""),
+				_indexParams.map!(v => "$%d".format(++index)).join(", ")
+				);
+
+		return str;
+	}
+
 	private string updateCommand()
 	{
 
@@ -206,22 +251,21 @@ struct QueryBuilder
 			case QueryType.update:
 				return updateCommand();
 			case QueryType.insert:
+				return insertCommand();
 		}
-		return "err";
 	}
 
 	@property private Value[] paramsArr()
 	{
-		Value[] res;// = _indexParams;
-		foreach (param; _indexParams)
-			res ~= param;
+		Value[] res = _indexParams;
+		//foreach (param; _indexParams)
+		//	res ~= param;
 
 		foreach (param, val; _params)
 			res ~= val;
 
 		return res;
 	}
-
 
 	void addParam(T)(T val)
 	{
