@@ -93,9 +93,9 @@ struct Connection
 	}
 
 	/// ditto, but port
-	@property const(string) port()
+	@property const(ushort) port()
 	{
-		return PQport(_connection).to!string;
+		return PQport(_connection).to!ushort;
 	}
 
 	/**
