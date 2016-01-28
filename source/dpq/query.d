@@ -12,24 +12,20 @@ struct Query
 	private Value[] _params;
 	private Connection* _connection;
 
-	this(ref Connection connection, string command = "")
-	{
-		_connection = &connection;
-		_command = command;
-	}
-
-	this(string command)
+	this(string command, Value[] params = [])
 	{
 		if (_dpqLastConnection == null)
 			throw new DPQException("Query: No established connection was found and none was provided.");
 
 		_connection = _dpqLastConnection;
 		_command = command;
+		_params = params;
 	}
 
-	this(ref Connection conn, string command, Value[] params)
+	this(ref Connection conn, string command = "", Value[] params = [])
 	{
-		this(conn, command);
+		_connection = &conn;
+		_command = command;
 		_params = params;
 	}
 
