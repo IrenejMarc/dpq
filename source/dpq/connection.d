@@ -465,6 +465,28 @@ struct Connection
 
 		return res;
 	}
+
+	int update(T, U...)(string filter, string update, U vals)
+	{
+		QueryBuilder qb;
+		qb.update(relationName!T)
+			.set(update)
+			.where(filter);
+
+		auto r = qb.query(this).run(vals);
+		return r.rows;
+	}
+
+	int update(T, U)(U id, Value[string] updates)
+	{
+		QueryBuilder qb;
+
+		qb.update(relationName!T)
+			.set(updates)
+			.where(primaryKeyName!T, id);
+
+		auto r = qb.query(this).run();
+		return r.rows;
 }
 
 /**
