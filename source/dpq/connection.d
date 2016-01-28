@@ -42,11 +42,13 @@ struct Connection
 		auto opts = PQconninfoParse(cast(char*)connString.toStringz, &err);
 
 		if (err != null)
-		{
 			throw new DPQException(err.fromStringz.to!string);
-		}
 
 		_connection = PQconnectdb(connString.toStringz);
+
+		if (status != ConnStatusType.CONNECTION_OK)
+			throw new DPQException(errorMessage);
+
 		_dpqLastConnection = &this;
 	}
 
@@ -66,6 +68,11 @@ struct Connection
 	{
 		PQfinish(_connection);
 		_connection = null;
+	}
+
+	@property const(ConnStatusType) status()
+	{
+		return PQstatus(_connection);
 	}
 
 	/** Returns the name of the database currently selected */
