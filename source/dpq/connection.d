@@ -31,9 +31,9 @@ struct Connection
 		Connection constructor
 
 		Params:
-			- connString - connection string
+			connString = connection string
 
-		See also:
+		See Also:
 			http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-CONNSTRING
 	*/
 	this(string connString)
@@ -256,19 +256,12 @@ struct Connection
 						static assert(false, "Cannot map type \"" ~ t.stringof ~ "\" of field " ~ m ~ " to any PG type, please specify it manually using @type.");
 				}
 				
-				writeln("All attrs: ", __traits(getAttributes, mixin("type." ~ m)));
-				writeln("Has FK UDA: ", hasUDA!(mixin("type." ~ m), ForeignKeyAttribute));
-				writeln("FK UDAs: ", getUDAs!(mixin("type." ~ m), ForeignKeyAttribute));
-				writeln("Has index UDA: ", hasUDA!(mixin("type." ~ m), IndexAttribute));
-				writeln("index UDAs: ", getUDAs!(mixin("type." ~ m), IndexAttribute));
-								
 				// Primary key
 				static if (hasUDA!(mixin("type." ~ m), PrimaryKeyAttribute))
 					cols ~= " PRIMARY KEY";
 				// Index
 				else static if (hasUDA!(mixin("type." ~ m), IndexAttribute))
 				{
-					writeln("Got Index!");
 					enum uda = getUDAs!(mixin("type." ~ m), IndexAttribute)[0];
 					additional ~= "CREATE%sINDEX \"%s\" ON \"%s\" (\"%s\")".format(
 							uda.unique ? " UNIQUE " : " ",
@@ -277,12 +270,10 @@ struct Connection
 							colName);
 
 					// DEBUG
-					writeln(additional[$ - 1]);
 				}
 				// Foreign key
 				else static if (hasUDA!(mixin("type." ~ m), ForeignKeyAttribute))
 				{
-					writeln("Got FK");
 //ALTER TABLE distributors ADD CONSTRAINT distfk FOREIGN KEY (address) REFERENCES addresses (address) MATCH FULL;
 					enum uda = getUDAs!(mixin("type." ~ m), ForeignKeyAttribute)[0];
 					additional ~= 
@@ -299,8 +290,6 @@ struct Connection
 							name,
 							colName);
 
-					// DEBUG
-					writeln(additional[$ - 2 .. $]);
 				}
 
 				cols ~= ", ";
@@ -312,7 +301,13 @@ struct Connection
 			exec(str);
 		}
 		foreach (cmd; additional)
-			exec(cmd);
+		{
+			try
+			{
+				exec(cmd);
+			}
+			catch {} // This just means the constraint/index already exists
+		}
 	}
 
 	/**
@@ -487,6 +482,7 @@ struct Connection
 
 		auto r = qb.query(this).run();
 		return r.rows;
+	}
 }
 
 /**
@@ -506,8 +502,8 @@ private string[] sqlMembers(T)()
 	Deserialises the given Row to the requested type
 
 	Params:
-		- T (template) - type to deserialise into
-		- r - Row to deserialise
+		T  = (template) type to deserialise into
+		r  = Row to deserialise
 */
 T deserialise(T)(Row r)
 {
