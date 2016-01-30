@@ -208,7 +208,6 @@ struct Value
 
 	Nullable!T as(T)()
 	{
-		import std.bitmanip;
 		const(ubyte)[] data = _valueBytes[0 .. _size];
 
 		return fromBytes!T(data);
