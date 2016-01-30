@@ -213,6 +213,32 @@ struct Connection
 		conn.ensureSchema!(User, Article);
 		-----------------------
 	*/
+	private string sqlType(T)()
+	{
+		// TODO: More types, embedded structs, Date types
+
+		static if (is(T == int))
+			return "INT";
+		else static if (is(T == long))
+			return "BIGINT";
+		else static if (is(T == float))
+			return "FLOAT4";
+		else static if (is(T == double))
+			return "FLOAT8";
+		else static if (is(T == char[]) || is(T == string))
+			return "TEXT";
+		else static if (is(T == bool))
+			return "BOOL";
+		else static if (is(T == char))
+			return "CHAR(1)";
+		else static if(is(T == ubyte[]) || is(T == byte[]))
+			return "BYTEA";
+		else static if (is(T == enum))
+			return sqlType!(OriginalType!T);
+		else
+			static assert(false, "Cannot map type \"" ~ t.stringof ~ "\" of field " ~ m ~ " to any PG type, please specify it manually using @type.");
+	}
+
 	void ensureSchema(T...)()
 	{
 		import std.stdio;
@@ -233,8 +259,6 @@ struct Connection
 
 				cols ~= " ";
 
-				// TODO: More types, embedded structs, Date types
-
 				// Basic data types
 				static if (hasUDA!(mixin("type." ~ m), PGTypeAttribute))
 					cols ~= getUDAs!(mixin("type." ~ m), PGTypeAttribute)[0].type;
@@ -242,25 +266,7 @@ struct Connection
 				{
 					alias tu = Unqual!(typeof(mixin("type." ~ m)));
 
-					static if (is(tu == int))
-						cols ~= "INT";
-					else static if (is(tu == long))
-						cols ~= "BIGINT";
-					else static if (is(tu == float))
-						cols ~= "FLOAT4";
-					else static if (is(tu == double))
-						cols ~= "FLOAT8";
-					else static if (is(tu == char[]) || is(tu == string))
-						cols ~= "TEXT";
-					else static if (is(tu == bool))
-						cols ~= "BOOL";
-					else static if (is(tu == char))
-						cols ~= "CHAR(1)";
-					else static if(is(tu == ubyte[]) || is(tu == byte[]))
-						cols ~= "BYTEA";
-					// Default to bytea because we fetch and send everything in binary anyway
-					else
-						static assert(false, "Cannot map type \"" ~ t.stringof ~ "\" of field " ~ m ~ " to any PG type, please specify it manually using @type.");
+					cols ~= sqlType!tu;
 				}
 				
 				// Primary key
