@@ -236,7 +236,7 @@ struct Connection
 		else static if (is(T == enum))
 			return sqlType!(OriginalType!T);
 		else
-			static assert(false, "Cannot map type \"" ~ t.stringof ~ "\" of field " ~ m ~ " to any PG type, please specify it manually using @type.");
+			static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" of field to any PG type, please specify it manually using @type.");
 	}
 
 	void ensureSchema(T...)()
