@@ -11,10 +11,10 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - Automatic (de-)serialisation of structs/classes
  - Automatic schema creation from struct/classes (includes PKs, FKs, indexes)
   
- ## Planned features
+## Planned features
  - Connection pooling
  
- ## Documentation
+## Documentation
 Documentation is in the code itself, though not complete
  
 ## Some notes:
