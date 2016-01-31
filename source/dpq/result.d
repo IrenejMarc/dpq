@@ -120,7 +120,7 @@ package struct Row
 	}
 }
 
-Nullable!T fromBytes(T)(ref const(ubyte)[] bytes)
+Nullable!T fromBytes(T)(ref const(ubyte)[] bytes, int len = 0)
 {	
 	import std.bitmanip : read;
 	import std.conv : to;
@@ -128,9 +128,11 @@ Nullable!T fromBytes(T)(ref const(ubyte)[] bytes)
 
 	static if (is(T == string))
 	{
-		string str = fromStringz(cast(const char*)bytes).to!string;
+		string str = cast(string)bytes[0 .. len];
 		return Nullable!string(str);
 	}
+	else static if (is(T == ubyte[]))
+		return Nullable!T(bytes.dup);
 	else
 		return Nullable!T(read!T(bytes));
 }

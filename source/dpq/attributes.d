@@ -121,12 +121,23 @@ template attributeName(alias R)
 	static if (hasUDA!(R, AttributeAttribute))
 		enum attributeName = getUDAs!(R, AttributeAttribute)[0].name;
 	else
-		enum attributeName = R.stringof;
+		enum attributeName = __traits(identifier, R);
+		//enum attributeName = R.stringof;
+}
+
+
+// Workaround for getSymbolsByUDA not working on structs/classes with private members
+template getMembersByUDA(T, alias attribute)
+{
+	import std.meta : Filter;
+
+	enum hasSpecificUDA(string name) = mixin("hasUDA!(T." ~ name ~ ", attribute)");
+	alias getMembersByUDA = Filter!(hasSpecificUDA, __traits(allMembers, T));
 }
 
 template primaryKeyName(T)
 {
-	alias fields = getSymbolsByUDA!(T, PrimaryKeyAttribute);
+	alias fields = getMembersByUDA!(T, PrimaryKeyAttribute);
 	static assert(fields.length < 2, "Multiple or composite primary key found for " ~ T.stringof ~ ", this is not currently supported");
 	static assert(fields.length == 1, "No primary key found for " ~ T.stringof);
 
@@ -140,7 +151,7 @@ template isPK(alias T, string m)
 
 string embeddedPrefix(T)()
 {
-	return "_" ~ attributeName!T ~ "_";
+	return "_" ~ relationName!T ~ "_";
 }
 
 Column[] attributeList(T)(bool ignorePK = false, bool insert = false)

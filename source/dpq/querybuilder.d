@@ -71,7 +71,13 @@ struct QueryBuilder
 		_type = QueryType.select;
 		_columns = [];
 		foreach(col; cols)
-			_columns ~= "%s AS %s".format(col.column, col.asName);
+		{
+			if (col.column != col.asName)
+				_columns ~= "%s AS %s".format(col.column, col.asName);
+			else
+				_columns ~= col.column;
+		}
+
 
 		return this;
 	}

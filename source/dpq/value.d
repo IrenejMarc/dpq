@@ -135,7 +135,10 @@ struct Value
 		_size = val.sizeof;
 
 		_valueBytes = new ubyte[_size];
-		write(_valueBytes, val, 0);
+		static if (is(T == ubyte[]))
+			_valueBytes = val;
+		else
+			write(_valueBytes, val, 0);
 
 
 		alias TU = std.typecons.Unqual!T;
@@ -209,8 +212,7 @@ struct Value
 	Nullable!T as(T)()
 	{
 		const(ubyte)[] data = _valueBytes[0 .. _size];
-
-		return fromBytes!T(data);
+		return fromBytes!T(data, _size);
 	}
 }
 

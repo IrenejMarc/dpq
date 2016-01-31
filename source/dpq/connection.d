@@ -259,7 +259,11 @@ struct Connection
 				string colName = attributeName!(mixin("type." ~ m));
 				cols ~= "\"" ~ colName ~ "\"";
 
-				alias t = typeof(mixin("type." ~ m));
+				// HACK: typeof a @property seems to be failing hard
+				static if (is(FunctionTypeOf!(mixin("type." ~ m)) == function))
+					alias t = typeof(mixin("type()." ~ m));
+				else
+					alias t = typeof(mixin("type." ~ m));
 
 				cols ~= " ";
 
@@ -268,7 +272,7 @@ struct Connection
 					cols ~= getUDAs!(mixin("type." ~ m), PGTypeAttribute)[0].type;
 				else
 				{
-					alias tu = Unqual!(typeof(mixin("type." ~ m)));
+					alias tu = Unqual!t;
 					static if (is(tu == class) || is(tu == struct))
 					{
 						ensureSchema!tu(true);
@@ -394,7 +398,7 @@ struct Connection
 		QueryBuilder qb;
 		qb.select(members)
 			.from(relationName!T)
-			.where("\"" ~ col ~ "\"" ~ " = {col_" ~ col ~ "}")
+			.where( col ~ " = {col_" ~ col ~ "}")
 			.limit(1);
 
 		qb["col_" ~ col] = val;
@@ -525,7 +529,7 @@ struct Connection
 
 		void addVals(T, U)(U val)
 		{
-			foreach (m; __traits(allMembers, T))
+			foreach (m; serialisableMembers!T)
 			{
 				static if (isPK!(T, m))
 					continue;
