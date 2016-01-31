@@ -10,12 +10,12 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - Exceptions on query errors
  - 
   
- ## Planned features
+## Planned features
  - Object-relational mapping
  - Automatic schema creating from objects
  - Connection pooling
  
- ## Documentation
+## Documentation
 There is no docs yet, in the future, they should be written into the source code itself.
  
 ## Some notes:
