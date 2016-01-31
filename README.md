@@ -47,7 +47,7 @@ struct User
 	@serial @PK int id;
 	
 	// @uniqueIndex will create an unique index, @index non-unique
-	/*@uniqueIndex*/ string username;
+	@uniqueIndex string username;
 	@index int posts;
 
 	// Struct inside structs can be used, they will be created as a type
@@ -61,7 +61,6 @@ struct User
 	private int _secret;
 	// A getter-setter pair will get (de-)serialised too.
 
-	/*
 	@property int secret()
 	{
 		return _secret;
@@ -71,7 +70,6 @@ struct User
 	{
 		_secret = newSecret;
 	}
-	*/
 }
 
 struct Post
@@ -146,7 +144,7 @@ void main()
 	writeln("Users: ", users);
 	
 
-  // Connection does not have to be closed, the destructor will take care of that,
+	// Connection does not have to be closed, the destructor will take care of that,
 	// but it can still manually be closed using conn.close()
 }
 
