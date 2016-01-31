@@ -236,10 +236,10 @@ struct Connection
 		else static if (is(T == enum))
 			return sqlType!(OriginalType!T);
 		else
-			static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" of field to any PG type, please specify it manually using @type.");
+			static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" to any PG type, please specify it manually using @type.");
 	}
 
-	void ensureSchema(T...)()
+	void ensureSchema(T...)(bool createType = false)
 	{
 		import std.stdio;
 		string[] additional;
@@ -247,7 +247,11 @@ struct Connection
 		foreach (type; T)
 		{
 			enum name = relationName!(type);
-			string str = "CREATE TABLE IF NOT EXISTS \"" ~ name ~ "\" (%s)";
+			string str;
+			if (createType)
+				str = "CREATE TYPE \"" ~ name ~ "\" AS (%s)";
+			else
+				str = "CREATE TABLE IF NOT EXISTS \"" ~ name ~ "\" (%s)";
 
 			string cols;
 			foreach(m; serialisableMembers!type)
@@ -265,13 +269,21 @@ struct Connection
 				else
 				{
 					alias tu = Unqual!(typeof(mixin("type." ~ m)));
-
-					cols ~= sqlType!tu;
+					static if (is(tu == class) || is(tu == struct))
+					{
+						ensureSchema!tu(true);
+						cols ~= '"' ~ relationName!tu ~ '"';
+					}
+					else
+						cols ~= sqlType!tu;
 				}
 				
 				// Primary key
 				static if (hasUDA!(mixin("type." ~ m), PrimaryKeyAttribute))
-					cols ~= " PRIMARY KEY";
+				{
+					if (!createType)
+						cols ~= " PRIMARY KEY";
+				}
 				// Index
 				else static if (hasUDA!(mixin("type." ~ m), IndexAttribute))
 				{
@@ -311,7 +323,16 @@ struct Connection
 			cols = cols[0 .. $ - 2];
 			str = str.format(cols);
 
-			exec(str);
+			if (createType)
+			{
+				try
+				{
+					exec(str);
+				}
+				catch {} // Do nothing, type already exists
+			}
+			else
+				exec(str);
 		}
 		foreach (cmd; additional)
 		{
@@ -500,14 +521,22 @@ struct Connection
 	bool insert(T)(T val)
 	{
 		QueryBuilder qb;
-		qb.insert(relationName!T, attributeList!T(true));
-		foreach (m; __traits(allMembers, T))
+		qb.insert(relationName!T, attributeList!T(true, true));
+
+		void addVals(T, U)(U val)
 		{
-			static if (isPK!(T, m))
-				continue;
-			else
-				qb.addValue(__traits(getMember, val, m));
+			foreach (m; __traits(allMembers, T))
+			{
+				static if (isPK!(T, m))
+					continue;
+				else static if (is(typeof(mixin("T." ~ m)) == class) || is(typeof(mixin("T." ~ m)) == struct))
+					addVals!(typeof(mixin("T." ~ m)))(__traits(getMember, val, m));
+				else
+					qb.addValue(__traits(getMember, val, m));
+			}
 		}
+
+		addVals!T(val);
 
 		auto r = qb.query(this).run();
 		return r.rows > 0;
@@ -522,17 +551,18 @@ struct Connection
 		T  = (template) type to deserialise into
 		r  = Row to deserialise
 */
-T deserialise(T)(Row r)
+T deserialise(T)(Row r, string prefix = "")
 {
 	T res;
 	foreach (m; serialisableMembers!T)
 	{
 		enum n = attributeName!(mixin("T." ~ m));
-		try
-		{
-			mixin("res." ~ m) = r[n].as!(typeof(mixin("res." ~ m)));
-		}
-		catch {}
+		alias mType = typeof(mixin("T." ~ m));
+
+		static if (is(mType == class) || is(mType == struct))
+			mixin("res." ~ m) = deserialise!mType(r, embeddedPrefix!mType ~ prefix);
+		else
+			mixin("res." ~ m) = r[prefix ~ n].as!(typeof(mixin("res." ~ m)));
 	}
 	return res;
 }

@@ -2,6 +2,9 @@ module dpq.attributes;
 
 import std.traits;
 import std.typetuple;
+import std.typecons;
+
+import dpq.column;
 
 RelationAttribute relation(string name)
 {
@@ -135,18 +138,41 @@ template isPK(alias T, string m)
 	enum isPK = hasUDA!(mixin("T." ~ m), PrimaryKeyAttribute);
 }
 
-string[] attributeList(T)(bool ignorePK = false)
+string embeddedPrefix(T)()
+{
+	return "_" ~ attributeName!T ~ "_";
+}
+
+Column[] attributeList(T)(bool ignorePK = false, bool insert = false)
 {
 	alias TU = Unqual!T;
-	pragma(msg, TU);
-	string[] res;
-	foreach(m; serialisableMembers!T)
-	{
-		if (ignorePK && isPK!(TU, m))
-			continue;
+	Column[] res;
 
-		res ~= attributeName!(mixin("T." ~ m));
+	void addMems(T)(string prefix = "", string asPrefix = "")
+	{
+		import std.string : format;
+		foreach(m; serialisableMembers!T)
+		{
+			alias mType = typeof(mixin("T." ~ m));
+			alias attrName = attributeName!(mixin("T." ~ m));
+			static if (is(mType == class) || is(mType == struct))
+			{
+				if (insert)
+					addMems!mType("\"%s\".%s".format(attrName, prefix));
+				else
+					addMems!mType("(\"%s\").%s".format(attrName, prefix), embeddedPrefix!mType);
+			}
+			else
+			{
+				if (ignorePK && isPK!(T, m))
+					continue;
+
+				res ~= Column("%s\"%s\"".format(prefix, attributeName!(mixin("T." ~ m))),
+						asPrefix ~ attrName);
+			}
+		}
 	}
+	addMems!TU;
 
 	return res;
 }

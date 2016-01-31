@@ -3,6 +3,7 @@ module dpq.querybuilder;
 import dpq.value;
 import dpq.query;
 import dpq.connection;
+import dpq.attributes : Column;
 
 import std.typecons;
 import std.string;
@@ -60,8 +61,18 @@ struct QueryBuilder
 	// SELECT methods
 	ref QueryBuilder select(string[] cols...)
 	{
-		_columns = cols;
+		_columns = cols;		
 		_type = QueryType.select;
+		return this;
+	}
+
+	ref QueryBuilder select(Column[] cols...)
+	{
+		_type = QueryType.select;
+		_columns = [];
+		foreach(col; cols)
+			_columns ~= "%s AS %s".format(col.column, col.asName);
+
 		return this;
 	}
 
@@ -149,6 +160,12 @@ struct QueryBuilder
 		return this;
 	}
 
+	ref QueryBuilder insert(string table, Column[] cols...)
+	{
+		import std.array;
+		return insert(table, array(cols.map!(c => c.column)));
+	}
+
 	ref QueryBuilder values(T...)(T vals)
 	{
 		assert(_type == QueryType.insert, "QueryBuilder.values() can only be used on INSERT queries");
@@ -193,7 +210,7 @@ struct QueryBuilder
 		if (_columns.length == 0)
 			cols = "*";
 		else
-			cols = "\"" ~ _columns.join("\", \"") ~ "\"";
+			cols = _columns.join(", ");
 
 		string str = "SELECT %s FROM \"%s\"".format(cols, _table);
 
@@ -220,9 +237,9 @@ struct QueryBuilder
 	private string insertCommand()
 	{
 		int index = 0;
-		string str = "INSERT INTO \"%s\" (\"%s\") VALUES (%s)".format(
+		string str = "INSERT INTO \"%s\" (%s) VALUES (%s)".format(
 				_table,
-				_columns.join("\",\""),
+				_columns.join(","),
 				_indexParams.map!(v => "$%d".format(++index)).join(", ")
 				);
 
@@ -234,7 +251,7 @@ struct QueryBuilder
 
 		string str = "UPDATE \"%s\" SET %s".format(
 				_table,
-				_set.join("\", \""));
+				_set.join(", "));
 
 		if (_filter.length > 0)
 			str ~= " WHERE " ~ _filter;
