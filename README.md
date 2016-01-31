@@ -8,23 +8,23 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - Fetching the results of queries in binary format
  - Looping through the said results
  - Exceptions on query errors
- - 
+ - Automatic (de-)serialisation of structs/classes
+ - Automatic schema creation from struct/classes (includes PKs, FKs, indexes)
   
-## Planned features
- - Object-relational mapping
- - Automatic schema creating from objects
+ ## Planned features
  - Connection pooling
  
-## Documentation
-There is no docs yet, in the future, they should be written into the source code itself.
+ ## Documentation
+Documentation is in the code itself, though not complete
  
 ## Some notes:
  - If a wrong type is specified while fetching a column, the results are undefined. Most likely just garbage
+ - Using QueryBuilder, when specifying columns, make sure they are not reserverd SQL keywords, they will not be escaped automatically (wrap keywords in `" "`)
 
 ## Licence
 MIT, read LICENSE.txt
 
-## Very simple example code
+## Example
 
 ```d
 import std.stdio;
