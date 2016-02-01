@@ -217,8 +217,11 @@ struct Connection
 	{
 		// TODO: More types, embedded structs, Date types
 
-		static if (is(T == int))
+		static if (is(T == int) || is(T == ushort))
 			return "INT";
+		static if (is(T == "long") || is(T == uint))
+		else static if (is(T == short))
+			return "INT2"
 		else static if (is(T == long))
 			return "BIGINT";
 		else static if (is(T == float))
