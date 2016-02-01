@@ -219,9 +219,10 @@ struct Connection
 
 		static if (is(T == int) || is(T == ushort))
 			return "INT";
-		static if (is(T == "long") || is(T == uint))
+		else static if (is(T == long) || is(T == uint))
+			return "INT8";
 		else static if (is(T == short))
-			return "INT2"
+			return "INT2";
 		else static if (is(T == long))
 			return "BIGINT";
 		else static if (is(T == float))
