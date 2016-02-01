@@ -150,7 +150,7 @@ struct Value
 		else static if (is(TU == long))
 			_type = Type.INT8;
 		//else static if (is(TU == long[]))
-		//	_type = Type.INT8ARRAY; // Does not exist?
+		//	_type = Type.INT8ARRAY;
 		else static if (is(TU == bool))
 			_type = Type.BOOL;
 		//else static if (is(TU == bool[]))
