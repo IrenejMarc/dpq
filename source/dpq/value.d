@@ -5,10 +5,11 @@ import dpq.result;
 import derelict.pq.pq;
 
 import std.algorithm : map;
-import std.variant;
 import std.array;
 import std.conv : to;
 import std.typecons : Nullable;
+import std.bitmanip;
+import std.traits;
 
 private enum Type : Oid
 {
@@ -119,8 +120,9 @@ struct Value
 		_size = len;
 		_type = type;
 
-		for (int i = 0; i < len; ++i)
-			_valueBytes ~= val[i];
+		_valueBytes = val[0 .. len].dup;
+		//for (int i = 0; i < len; ++i)
+		//	_valueBytes ~= val[i];
 	}
 
 	this(Value val)
@@ -129,55 +131,27 @@ struct Value
 	}
 
 	void opAssign(T)(T val)
+			if (isArray!T)
 	{
-		import std.bitmanip;
+		_size = (ForeachType!T.sizeof * val.length).to!int;
 
-		_size = val.sizeof;
-
-		_valueBytes = new ubyte[_size];
 		static if (is(T == ubyte[]))
 			_valueBytes = val;
 		else
 			write(_valueBytes, val, 0);
 
+		_type = sqlType!T;
+	}
 
-		alias TU = std.typecons.Unqual!T;
+	void opAssign(T)(T val)
+			if(!isArray!T)
+	{
+		_size = val.sizeof;
 
-		static if (is(TU == int))
-			_type = Type.INT4;
-		else static if (is(TU == int[]))
-			_type = Type.INT4ARRAY;
-		else static if (is(TU == long))
-			_type = Type.INT8;
-		//else static if (is(TU == long[]))
-		//	_type = Type.INT8ARRAY;
-		else static if (is(TU == bool))
-			_type = Type.BOOL;
-		//else static if (is(TU == bool[]))
-		//	_type = Type.;
-		else static if (is(TU == byte))
-			_type = Type.INT2;
-		else static if (is(TU == byte[]))
-			_type = Type.INT2ARRAY;
-		else static if (is(TU == char))
-			_type = Type.CHAR;
-		else static if (is(TU == char[]))
-			_type = Type.TEXT;
-		else static if (is(TU == short))
-			_type = Type.INT2;
-		else static if (is(TU == short[]))
-			_type = Type.INT2ARRAY;
-		else static if (is(TU == float))
-			_type = Type.FLOAT4;
-		else static if (is(TU == float[]))
-			_type = Type.FLOAT4ARRAY;
-		else static if (is(TU == double))
-			_type = Type.FLOAT8;
-		//else static if (is(TU == double[]))
-		//	type = Type.;
-		else
-			// Try to infer
-			_type = Type.INFER;
+		_valueBytes = new ubyte[_size];
+		write(_valueBytes, val, 0);
+
+		_type = sqlType!T;
 	}
 
 	void opAssign(string val)
@@ -214,6 +188,64 @@ struct Value
 		const(ubyte)[] data = _valueBytes[0 .. _size];
 		return fromBytes!T(data, _size);
 	}
+}
+
+Type sqlType(T)()
+{
+		alias TU = std.typecons.Unqual!T;
+
+		static if (is(TU == int))
+			return Type.INT4;
+		else static if (is(TU == int[]))
+			return Type.INT4ARRAY;
+		else static if (is(TU == long))
+			return Type.INT8;
+		//else static if (is(TU == long[]))
+		//	return Type.INT8ARRAY;
+		else static if (is(TU == bool))
+			return Type.BOOL;
+		//else static if (is(TU == bool[]))
+		//	return Type.;
+		else static if (is(TU == byte))
+			return Type.INT2;
+		else static if (is(TU == byte[]) || is(TU == ubyte[]))
+			return Type.BYTEA;
+		else static if (is(TU == char))
+			return Type.CHAR;
+		else static if (is(TU == char[]))
+			return Type.TEXT;
+		else static if (is(TU == short))
+			return Type.INT2;
+		else static if (is(TU == short[]))
+			return Type.INT2ARRAY;
+		else static if (is(TU == float))
+			return Type.FLOAT4;
+		else static if (is(TU == float[]))
+			return Type.FLOAT4ARRAY;
+		else static if (is(TU == double))
+			return Type.FLOAT8;
+
+		/**
+			Since unsigned types are not supported by PostgreSQL, we use signed
+			types for them. Transfer and representation in D will still work correctly,
+			but SELECTing them in the psql console, or as a string might result in 
+			a negative number.
+
+			It is recommended not to use unsigned types in structures, that will
+			be used in the DB directly.
+		*/
+		else static if (is(TU == ulong))
+			return Type.INT8;
+		else static if (is(TU == uint))
+			return Type.INT4;
+		else static if (is(TU == ushort) || is(TU == char))
+			return Type.INT2;
+		else static if (is(TU == ubyte))
+			return Type.CHAR;
+		
+		else
+			// Try to infer
+			return Type.INFER;
 }
 
 Oid[] paramTypes(Value[] values)
