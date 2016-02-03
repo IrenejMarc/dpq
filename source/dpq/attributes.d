@@ -116,6 +116,16 @@ template relationName(alias R)
 	enum relationName = relName();
 }
 
+
+string snakeCase(string str)
+{
+	import std.regex;
+	import std.string;
+
+	static auto r = regex(r"([a-z][A-Z])", "g");
+	return str.replaceAll(r, r"\1_\2").toLower;
+}
+
 template attributeName(alias R)
 {
 	static if (hasUDA!(R, AttributeAttribute))
