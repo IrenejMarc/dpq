@@ -105,25 +105,36 @@ alias FKey = foreignKey;
 
 template relationName(alias R)
 {
-	string relName()
-	{
-		static if (hasUDA!(R, RelationAttribute))
-			return getUDAs!(R, RelationAttribute)[0].name;
-		else
-			return R.stringof;
-	}
-
-	enum relationName = relName();
+	static if (hasUDA!(R, RelationAttribute))
+		enum relationName = getUDAs!(R, RelationAttribute)[0].name;
+	else
+		enum relationName = SnakeCase!(R.stringof);
 }
 
-
-string snakeCase(string str)
+template SnakeCase(string str)
 {
-	import std.regex;
-	import std.string;
+	import std.string : toLower;
 
-	static auto r = regex(r"([a-z][A-Z])", "g");
-	return str.replaceAll(r, r"\1_\2").toLower;
+	template IsLower(char c)
+	{
+		enum IsLower = (c >= 'a' && c <= 'z');
+	}
+	template IsUpper(char c)
+	{
+		enum IsUpper = (c >= 'A' && c <= 'Z');
+	}
+
+	template Snake(string str)
+	{
+		static if (str.length < 2)
+			enum Snake = str;
+		else static if (IsLower!(str[0]) && IsUpper!(str[1]))
+			enum Snake = str[0] ~ "_" ~ str[1] ~ SnakeCase!(str[2 .. $]);
+		else
+			enum Snake = str[0] ~ SnakeCase!(str[1 .. $]);
+	}
+
+	enum SnakeCase = Snake!str.toLower;
 }
 
 template attributeName(alias R)
@@ -131,8 +142,7 @@ template attributeName(alias R)
 	static if (hasUDA!(R, AttributeAttribute))
 		enum attributeName = getUDAs!(R, AttributeAttribute)[0].name;
 	else
-		enum attributeName = __traits(identifier, R);
-		//enum attributeName = R.stringof;
+		enum attributeName = SnakeCase!(__traits(identifier, R));
 }
 
 
