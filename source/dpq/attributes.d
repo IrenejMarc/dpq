@@ -124,6 +124,7 @@ template SnakeCase(string str)
 		enum IsUpper = (c >= 'A' && c <= 'Z');
 	}
 
+	// Ssss, sss.
 	template Snake(string str)
 	{
 		static if (str.length < 2)
@@ -174,7 +175,48 @@ string embeddedPrefix(T)()
 	return "_" ~ relationName!T ~ "_";
 }
 
-Column[] attributeList(T)(bool ignorePK = false, bool insert = false)
+
+template AttributeList2(T, string prefix = "", bool ignorePK = false, bool insert = false, fields...)
+{
+	static if (fields.length == 0)
+	{
+		pragma(msg, " -- Empty");
+		enum AttributeList2 = [];
+	}
+	else
+	{
+		pragma(msg, prefix ~ fields[0]);
+		alias mt = typeof(mixin("T." ~ fields[0]));
+
+		static if (is(mt == struct) || is(mt == class))
+		{
+			static if (insert)
+				enum pref = "\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\".";
+			else
+				enum pref = "(\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\").";
+
+			pragma(msg, " * " ~ fields[0]);
+			enum AttributeList2 = AttributeList2!(
+					typeof(mixin("T." ~ fields[0])),
+					pref ~ prefix, 
+					ignorePK,
+					insert,
+					serialisableMembers!(typeof(mixin("T." ~ fields[0])))) ~
+			AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
+		}
+		else
+			enum AttributeList2 = [Column(prefix ~ attributeName!(mixin("T." ~ fields[0])))] ~ AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
+	}
+
+}
+
+template AttributeList(T)
+{
+	alias AttributeList = AttributeList2!(T, "", false, false, serialisableMembers!(T));
+}
+
+deprecated("Use compile-time AttributeList!T instead")
+	Column[] attributeList(T)(bool ignorePK = false, bool insert = false) pure
 {
 	alias TU = Unqual!T;
 	Column[] res;

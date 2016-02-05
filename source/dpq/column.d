@@ -13,6 +13,4 @@ struct Column
 	{
 		_asName = n;
 	}
-
-	alias column this;
 }
