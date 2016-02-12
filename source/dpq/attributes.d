@@ -188,7 +188,9 @@ template AttributeList2(T, string prefix = "", bool ignorePK = false, bool inser
 		pragma(msg, prefix ~ fields[0]);
 		alias mt = typeof(mixin("T." ~ fields[0]));
 
-		static if (is(mt == struct) || is(mt == class))
+		static if (isPK!(T, fields[0]))
+			enum AttributeList2 = AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
+		else static if (is(mt == struct) || is(mt == class))
 		{
 			static if (insert)
 				enum pref = "\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\".";
@@ -210,9 +212,9 @@ template AttributeList2(T, string prefix = "", bool ignorePK = false, bool inser
 
 }
 
-template AttributeList(T)
+template AttributeList(T, bool ignorePK = false, bool insert = false)
 {
-	alias AttributeList = AttributeList2!(T, "", false, false, serialisableMembers!(T));
+	alias AttributeList = AttributeList2!(T, "", ignorePK, insert, serialisableMembers!(T));
 }
 
 deprecated("Use compile-time AttributeList!T instead")
