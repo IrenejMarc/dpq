@@ -7,6 +7,7 @@ import dpq.result;
 import dpq.value;
 import dpq.attributes;
 import dpq.querybuilder;
+import dpq.meta;
 
 import std.string;
 import derelict.pq.pq;
@@ -213,36 +214,6 @@ struct Connection
 		conn.ensureSchema!(User, Article);
 		-----------------------
 	*/
-	private string sqlType(T)()
-	{
-		// TODO: More types, embedded structs, Date types
-
-		static if (is(T == int) || is(T == ushort))
-			return "INT";
-		else static if (is(T == long) || is(T == uint))
-			return "INT8";
-		else static if (is(T == short))
-			return "INT2";
-		else static if (is(T == long))
-			return "BIGINT";
-		else static if (is(T == float))
-			return "FLOAT4";
-		else static if (is(T == double))
-			return "FLOAT8";
-		else static if (is(T == char[]) || is(T == string))
-			return "TEXT";
-		else static if (is(T == bool))
-			return "BOOL";
-		else static if (is(T == char))
-			return "CHAR(1)";
-		else static if(is(T == ubyte[]) || is(T == byte[]))
-			return "BYTEA";
-		else static if (is(T == enum))
-			return sqlType!(OriginalType!T);
-		else
-			static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" to any PG type, please specify it manually using @type.");
-	}
-
 	void ensureSchema(T...)(bool createType = false)
 	{
 		import std.stdio;
@@ -283,7 +254,7 @@ struct Connection
 						cols ~= '"' ~ relationName!tu ~ '"';
 					}
 					else
-						cols ~= sqlType!tu;
+						cols ~= SQLType!tu;
 				}
 				
 				// Primary key
@@ -449,7 +420,7 @@ struct Connection
 	Nullable!T findOne(T, U...)(string filter, U vals)
 	{
 		QueryBuilder qb;
-		qb.select(sqlMembers!T)
+		qb.select(AttributeList!T)
 			.from(relationName!T)
 			.where(filter)
 			.limit(1);
@@ -526,10 +497,26 @@ struct Connection
 		return r.rows;
 	}
 
+	int update(T, U)(U id, T updates)
+	{
+		import dpq.attributes;
+
+		QueryBuilder qb;
+
+		qb.update(relationName!T)
+			.where(primaryKeyName!T, id);
+
+		foreach (m; AttributeList!(T, true))
+			qb.set(attributeName!(mixin("T." ~ m), __traits(getMember, updates, m)));
+
+		auto r = qb.query(this).run();
+		return r.rows;
+	}
+
 	bool insert(T)(T val)
 	{
 		QueryBuilder qb;
-		qb.insert(relationName!T, attributeList!T(true, true));
+		qb.insert(relationName!T, AttributeList!(T, true, true));
 
 		void addVals(T, U)(U val)
 		{
@@ -568,9 +555,13 @@ T deserialise(T)(Row r, string prefix = "")
 		alias mType = typeof(mixin("T." ~ m));
 
 		static if (is(mType == class) || is(mType == struct))
-			mixin("res." ~ m) = deserialise!mType(r, embeddedPrefix!mType ~ prefix);
+			__traits(getMember, res, m) = deserialise!mType(r, embeddedPrefix!mType ~ prefix);
 		else
-			mixin("res." ~ m) = r[prefix ~ n].as!(typeof(mixin("res." ~ m)));
+		{
+			auto x = r[prefix ~ n].as!(typeof(mixin("res." ~ m)));
+			if (!x.isNull)
+				__traits(getMember, res, m) = x;
+		}
 	}
 	return res;
 }
