@@ -1,6 +1,8 @@
 module dpq.value;
 
 import dpq.result;
+import dpq.exception;
+import dpq.pgarray;
 
 import derelict.pq.pq;
 
@@ -108,6 +110,12 @@ struct Value
 		ubyte[] _valueBytes;
 		int _size;
 		Type _type;
+		bool _isNull;
+	}
+
+	this(typeof(null) n)
+	{
+		_isNull = true;
 	}
 
 	this(T)(T val)
@@ -121,8 +129,6 @@ struct Value
 		_type = type;
 
 		_valueBytes = val[0 .. len].dup;
-		//for (int i = 0; i < len; ++i)
-		//	_valueBytes ~= val[i];
 	}
 
 	this(Value val)
@@ -138,9 +144,12 @@ struct Value
 		static if (is(T == ubyte[]))
 			_valueBytes = val;
 		else
-			write(_valueBytes, val, 0);
+		{
+			_valueBytes = PGArray(val).toBytes();
+			_size = _valueBytes.length.to!int;
+		}
 
-		_type = sqlType!T;
+		_type = typeOid!T;
 	}
 
 	void opAssign(T)(T val)
@@ -148,10 +157,11 @@ struct Value
 	{
 		_size = val.sizeof;
 
-		_valueBytes = new ubyte[_size];
-		write(_valueBytes, val, 0);
+		//_valueBytes = new ubyte[_size];
+		//write(_valueBytes, val, 0);
+		_valueBytes = nativeToBigEndian(val).dup;
 
-		_type = sqlType!T;
+		_type = typeOid!T;
 	}
 
 	void opAssign(string val)
@@ -185,12 +195,19 @@ struct Value
 
 	Nullable!T as(T)()
 	{
+		if (_isNull)
+			return Nullable!T.init;
+
 		const(ubyte)[] data = _valueBytes[0 .. _size];
 		return fromBytes!T(data, _size);
 	}
 }
 
-Type sqlType(T)()
+
+
+
+
+Type typeOid(T)()
 {
 		alias TU = std.typecons.Unqual!T;
 

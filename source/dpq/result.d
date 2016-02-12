@@ -6,14 +6,18 @@ import std.stdio;
 import std.string;
 import std.typecons;
 import std.datetime;
+import std.traits;
 
 import dpq.value;
 import dpq.exception;
+import dpq.pgarray;
 
 struct Result
 {
 	PGresult* _result;
 	private TickDuration _time;
+
+	@disable this(this);
 
 	this(PGresult* res)
 	{
@@ -62,6 +66,9 @@ struct Result
 
 	Value get(int row, int col)
 	{
+		if (PQgetisnull(_result, row, col))
+			return Value(null);
+
 		const(ubyte)* data = PQgetvalue(_result, row, col);
 		int len = PQgetlength(_result, row, col);
 		
@@ -93,6 +100,8 @@ struct Result
 
 	Row opIndex(int row)
 	{
+		if (row >= rows())
+			throw new DPQException("Row %d out of range. Result has %d rows.".format(row, rows()));
 		return Row(row, this);
 	}
 }
@@ -122,17 +131,24 @@ package struct Row
 
 Nullable!T fromBytes(T)(ref const(ubyte)[] bytes, int len = 0)
 {	
-	import std.bitmanip : read;
+	import std.bitmanip;
 	import std.conv : to;
 
+	alias TU = Unqual!T;
 
-	static if (is(T == string))
+	static if (is(TU == string))
 	{
 		string str = cast(string)bytes[0 .. len];
 		return Nullable!string(str);
 	}
-	else static if (is(T == ubyte[]))
+	else static if (is(TU == ubyte[]))
 		return Nullable!T(bytes.dup);
+	else static if (isArray!T)
+	{
+		auto arr = PGArray(bytes);
+		return Nullable!T(cast(T)arr);
+	}
 	else
-		return Nullable!T(read!T(bytes));
+		return Nullable!T(bigEndianToNative!(T, T.sizeof)(bytes.to!(ubyte[T.sizeof])));
+		//return Nullable!T(read!T(bytes));
 }
