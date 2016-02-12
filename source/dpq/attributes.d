@@ -180,12 +180,10 @@ template AttributeList2(T, string prefix = "", bool ignorePK = false, bool inser
 {
 	static if (fields.length == 0)
 	{
-		pragma(msg, " -- Empty");
 		enum AttributeList2 = [];
 	}
 	else
 	{
-		pragma(msg, prefix ~ fields[0]);
 		alias mt = typeof(mixin("T." ~ fields[0]));
 
 		static if (isPK!(T, fields[0]))
@@ -197,7 +195,6 @@ template AttributeList2(T, string prefix = "", bool ignorePK = false, bool inser
 			else
 				enum pref = "(\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\").";
 
-			pragma(msg, " * " ~ fields[0]);
 			enum AttributeList2 = AttributeList2!(
 					typeof(mixin("T." ~ fields[0])),
 					pref ~ prefix, 
