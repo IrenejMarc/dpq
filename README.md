@@ -10,9 +10,12 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - Exceptions on query errors
  - Automatic (de-)serialisation of structs/classes
  - Automatic schema creation from struct/classes (includes PKs, FKs, indexes)
+ - Reading and writing to array fields (up to 6-dimensions, limited by PostgreSQL)
   
 ## Planned features
  - Connection pooling
+ - Date/Time types support
+ - Extensive documentantion
  
 ## Documentation
 Documentation is in the code itself, though not complete
