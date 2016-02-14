@@ -67,7 +67,8 @@ struct Query
 
 		StopWatch sw;
 		sw.start();
-		auto r = _connection.execParams(_command, _params);
+
+		Result r = _connection.execParams(_command, _params);
 		sw.stop();
 
 		r.time = sw.peek();
@@ -80,5 +81,24 @@ struct Query
 			addParam(p);
 
 		return run();
+	}
+
+	bool runAsync(T...)(T params)
+	{
+		foreach (p; params)
+			addParam(p);
+
+		return runAsync();
+	}
+
+	bool runAsync()
+	{
+		if (_params.length > 0)
+		{
+			_connection.sendParams(_command, _params);
+			return true; // FIXME: must return actual sendQueryParams status
+		}
+
+		return _connection.send(_command);
 	}
 }

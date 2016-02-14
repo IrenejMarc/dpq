@@ -14,13 +14,19 @@ import dpq.pgarray;
 
 struct Result
 {
-	PGresult* _result;
+	private PGresult* _result;
 	private TickDuration _time;
 
 	@disable this(this);
 
 	this(PGresult* res)
 	{
+		if (res == null)
+		{
+			_result = null;
+			return;
+		}
+
 		ExecStatusType status = PQresultStatus(res);
 
 		switch (status)
@@ -42,6 +48,7 @@ struct Result
 	~this()
 	{
 		PQclear(_result);
+		_result = null;
 	}
 
 	@property int rows()
@@ -66,13 +73,17 @@ struct Result
 
 	Value get(int row, int col)
 	{
+		if (_result is null)
+			throw new DPQException("Called get() on a null Result");
+
 		if (PQgetisnull(_result, row, col))
 			return Value(null);
 
 		const(ubyte)* data = PQgetvalue(_result, row, col);
 		int len = PQgetlength(_result, row, col);
+		Oid oid = PQftype(_result, col);
 		
-		return Value(data, len);
+		return Value(data, len, oid.to!Type);
 	}
 
 	int columnIndex(string col)
@@ -82,6 +93,11 @@ struct Result
 			throw new DPQException("Column " ~ col ~ " was not found");
 
 		return index;
+	}
+
+	string colName(int col)
+	{
+		return PQfname(_result, col).fromStringz.to!string;
 	}
 
 	int opApply(int delegate(ref Row) dg)
@@ -103,6 +119,12 @@ struct Result
 		if (row >= rows())
 			throw new DPQException("Row %d out of range. Result has %d rows.".format(row, rows()));
 		return Row(row, this);
+	}
+
+	T opCast(T)()
+			if (is(T == bool))
+	{
+		return _result != null;
 	}
 }
 
@@ -126,6 +148,35 @@ package struct Row
 	{
 		int c = _parent.columnIndex(col);
 		return opIndex(c);
+	}
+
+	int opApply(int delegate(Value) dg)
+	{
+		int result = 0;
+
+		for (int i = 0; i < _parent.columns; ++i)
+		{
+			auto val = this[i];
+			result = dg(val);
+			if (result)
+				break;
+		}
+		return result;
+	}
+
+	int opApply(int delegate(string, Value) dg)
+	{
+		int result = 0;
+
+		for (int i = 0; i < _parent.columns; ++i)
+		{
+			auto val = this[i];
+			string name = _parent.colName(i);
+			result = dg(name, val);
+			if (result)
+				break;
+		}
+		return result;
 	}
 }
 

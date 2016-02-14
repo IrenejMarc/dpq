@@ -13,7 +13,7 @@ import std.typecons : Nullable;
 import std.bitmanip;
 import std.traits;
 
-private enum Type : Oid
+package enum Type : Oid
 {
 	INFER = 0,
 	BOOL = 16,

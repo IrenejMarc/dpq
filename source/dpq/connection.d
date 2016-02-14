@@ -124,6 +124,12 @@ struct Connection
 		return Result(res);
 	}
 
+	/// ditto, async
+	bool send(string command)
+	{
+		return PQsendQuery(_connection, cast(const char*)command.toStringz) == 1;
+	}
+
 	/**
 		Executes the given string with given params
 
@@ -143,7 +149,7 @@ struct Connection
 		See also:
 			http://www.postgresql.org/docs/9.3/static/libpq-exec.html
 	*/
-	Result execParams(T...)(string command, T params)
+	Result execParams(T...)(string command, T params, bool async = false)
 	{
 		Value[] values;
 		foreach(param; params)
@@ -152,8 +158,13 @@ struct Connection
 		return execParams(command, values);
 	}
 
+	void sendParams(T...)(string command, T params)
+	{
+		execParams(command, params, true);
+	}
+
 	/// ditto, but taking an array of params, instead of variadic template
-	Result execParams(string command, Value[] params)
+	Result execParams(string command, Value[] params, bool async = false)
 	{
 		const char* cStr = cast(const char*) command.toStringz;
 
@@ -162,17 +173,36 @@ struct Connection
 		auto pLengths = params.paramLengths;
 		auto pFormats = params.paramFormats;
 
-		auto res = PQexecParams(
-				_connection, 
-				cStr, 
-				params.length.to!int, 
-				pTypes.ptr, 
+		if (async)
+		{
+			PQsendQueryParams(
+				_connection,
+				cStr,
+				params.length.to!int,
+				pTypes.ptr,
 				pValues.ptr,
 				pLengths.ptr,
 				pFormats.ptr,
 				1);
 
-		return Result(res);
+			return Result(null);
+		}
+		else
+			return Result(PQexecParams(
+					_connection, 
+					cStr, 
+					params.length.to!int,
+					pTypes.ptr, 
+					pValues.ptr,
+					pLengths.ptr,
+					pFormats.ptr,
+					1));
+	}
+
+	/// ditto, async
+	void sendParams(string command, Value[] params)
+	{
+		execParams(command, params, true);
 	}
 
 	/**
@@ -206,7 +236,7 @@ struct Connection
 		{
 			@serial8 @PKey long id;
 			string username;
-			ubyte[] passwordHash;
+			byte[] passwordHash;
 		};
 
 		struct Article { ... };
@@ -253,8 +283,7 @@ struct Connection
 						ensureSchema!tu(true);
 						cols ~= '"' ~ relationName!tu ~ '"';
 					}
-					else
-						cols ~= SQLType!tu;
+					else						cols ~= SQLType!tu;
 				}
 				
 				// Primary key
@@ -301,7 +330,6 @@ struct Connection
 
 			cols = cols[0 .. $ - 2];
 			str = str.format(cols);
-
 			if (createType)
 			{
 				try
@@ -349,7 +377,6 @@ struct Connection
 	/**
 		Returns the requestes structure, searches by the given column name
 		with the given value
-
 		If not rows are returned, a Nullable null value is returned
 
 		Examples:
@@ -513,7 +540,7 @@ struct Connection
 		return r.rows;
 	}
 
-	bool insert(T)(T val)
+	bool insert(T)(T val, bool async = false)
 	{
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
@@ -533,8 +560,39 @@ struct Connection
 
 		addVals!T(val);
 
+		if (async)
+		{
+			return qb.query(this).runAsync();
+		}
+
 		auto r = qb.query(this).run();
 		return r.rows > 0;
+	}
+
+	void insertAsync(T)(T val)
+	{
+		insert(val, true);
+	}
+
+	bool isBusy()
+	{
+		return PQisBusy(_connection) == 1;
+	}
+
+
+	Result nextResult()
+	{
+		import core.thread;
+
+		do
+		{
+			PQconsumeInput(_connection);
+			Thread.sleep(dur!"msecs"(1)); // What's a reasonable amount of time to wait?
+		}
+		while (isBusy());
+
+		PGresult* res = PQgetResult(_connection);
+		return Result(res);
 	}
 }
 
