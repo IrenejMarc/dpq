@@ -512,7 +512,17 @@ struct Connection
 		return r.rows;
 	}
 
-	int update(T, U)(U id, Value[string] updates)
+	void updateAsync(T, U...)(string filter, string update, U vals)
+	{
+		QueryBuilder qb;
+		qb.update(relationName!T)
+			.set(update)
+			.where(filter);
+
+		qb.query(this).runAsync(vals);
+	}
+
+	int update(T, U)(U id, Value[string] updates, bool async = false)
 	{
 		QueryBuilder qb;
 
@@ -520,11 +530,24 @@ struct Connection
 			.set(updates)
 			.where(primaryKeyName!T, id);
 
-		auto r = qb.query(this).run();
+		auto q = qb.query(this);
+
+		if (async)
+		{
+			q.runAsync();
+			return -1;
+		}
+
+		auto r = q.run();
 		return r.rows;
 	}
 
-	int update(T, U)(U id, T updates)
+	void updateAsync(T, U)(U id, Value[string] updates)
+	{
+		update!T(id, updates, true);
+	}
+
+	int update(T, U)(U id, T updates, bool async = false)
 	{
 		import dpq.attributes;
 
@@ -536,8 +559,20 @@ struct Connection
 		foreach (m; AttributeList!(T, true))
 			qb.set(attributeName!(mixin("T." ~ m), __traits(getMember, updates, m)));
 
-		auto r = qb.query(this).run();
+		auto q = qb.query(this);
+		if (async)
+		{
+			qb.query(this).runAsync();
+			return -1;
+		}
+
+		auto r = q.run();
 		return r.rows;
+	}
+
+	void updateAsync(T, U)(U id, T updates)
+	{
+		update(id, T, true);
 	}
 
 	bool insert(T)(T val, bool async = false)
@@ -580,6 +615,11 @@ struct Connection
 	}
 
 
+	/**
+		 Blocks until a result is read, then returns it
+
+		 If no more results remain, a null result will be returned
+	*/
 	Result nextResult()
 	{
 		import core.thread;
