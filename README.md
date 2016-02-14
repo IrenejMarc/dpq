@@ -11,9 +11,11 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - Automatic (de-)serialisation of structs/classes
  - Automatic schema creation from struct/classes (includes PKs, FKs, indexes)
  - Reading and writing to array fields (up to 6-dimensions, limited by PostgreSQL)
+ - Basic asynchronous query support with Query.runAsync()
+ - Prepared statements
   
 ## Planned features
- - Connection pooling
+ - Connection pooling (maybe)
  - Date/Time types support
  - Extensive documentantion
  
@@ -101,7 +103,7 @@ void main()
 	// Last connection will be used if none is specified as the first param to Query()
 	q = Query("SELECT id, txt FROM test WHERE id = $1 OR id = $2");
 	// Params could also be added with the << operator
-	// r << 4 << 1;
+	// q << 4 << 1;
 	Result r = q.run(4, 1);
 
 	writefln("Our query returned %d rows, each with %d columns", r.rows, r.columns);
