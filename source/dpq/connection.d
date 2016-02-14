@@ -634,6 +634,41 @@ struct Connection
 		PGresult* res = PQgetResult(_connection);
 		return Result(res);
 	}
+
+	Result prepare(T...)(string name, string command, T paramTypes)
+	{
+		Oid[] oids;
+		foreach (pType; paramTypes)
+			oids ~= pType;
+
+		char* cName = cast(char*) name.toStringz;
+		char* cComm = cast(char*) command.toStringz;
+
+		return Result(PQprepare(
+					_connection,
+					cName,
+					cComm,
+					oids.length.to!int,
+					oids.ptr));
+	}
+
+	Result execPrepared(T...)(string name, T params)
+	{
+		Value[] vals;
+		foreach (p; params)
+			vals ~= Value(p);
+
+		char* cStr = cast(char*) name.toStringz;
+
+		return Result(PQexecPrepared(
+					_connection,
+					cStr,
+					vals.length.to!int,
+					cast(char**) vals.paramValues.ptr,
+					vals.paramLengths.ptr,
+					vals.paramFormats.ptr,
+					1));
+	}
 }
 
 
