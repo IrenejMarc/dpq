@@ -8,6 +8,7 @@ import dpq.value;
 import dpq.attributes;
 import dpq.querybuilder;
 import dpq.meta;
+import dpq.prepared;
 
 import std.string;
 import derelict.pq.pq;
@@ -27,6 +28,7 @@ import std.typecons;
 struct Connection
 {
 	private PGconn* _connection;
+	private PreparedStatement[string] _prepared;
 
 	/**
 		Connection constructor
@@ -644,6 +646,9 @@ struct Connection
 		char* cName = cast(char*) name.toStringz;
 		char* cComm = cast(char*) command.toStringz;
 
+		auto p = PreparedStatement(this, name, command, oids);
+		_prepared[name] = p;
+
 		return Result(PQprepare(
 					_connection,
 					cName,
@@ -652,22 +657,60 @@ struct Connection
 					oids.ptr));
 	}
 
+	Result execPrepared(string name, Value[] params...)
+	{
+		char* cStr = cast(char*) name.toStringz;
+
+		return Result(PQexecPrepared(
+					_connection,
+					cStr,
+					params.length.to!int,
+					cast(char**) params.paramValues.ptr,
+					params.paramLengths.ptr,
+					params.paramFormats.ptr,
+					1));
+	}
+
 	Result execPrepared(T...)(string name, T params)
 	{
 		Value[] vals;
 		foreach (p; params)
 			vals ~= Value(p);
 
+		return execPrepared(name, vals);
+	}
+
+	bool sendPrepared(string name, Value[] params...)
+	{
 		char* cStr = cast(char*) name.toStringz;
 
-		return Result(PQexecPrepared(
-					_connection,
-					cStr,
-					vals.length.to!int,
-					cast(char**) vals.paramValues.ptr,
-					vals.paramLengths.ptr,
-					vals.paramFormats.ptr,
-					1));
+		return PQsendQueryPrepared(
+				_connection,
+				cStr,
+				params.length.to!int,
+				cast(char**) params.paramValues.ptr,
+				params.paramLengths.ptr,
+				params.paramFormats.ptr,
+				1) == 1;
+	}
+
+	bool sendPrepared(T...)(string name, T params)
+	{
+		Value[] vals;
+		foreach (p; params)
+			vals ~= Value(p);
+
+		return sendPrepared(name, vals);
+	}
+	
+	ref PreparedStatement prepared(string name)
+	{
+		return _prepared[name];
+	}
+
+	ref PreparedStatement opIndex(string name)
+	{
+		return prepared(name);
 	}
 }
 
