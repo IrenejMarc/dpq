@@ -611,6 +611,49 @@ struct Connection
 		insert(val, true);
 	}
 
+	int remove(T, U)(U id)
+	{
+		QueryBuilder qb;
+		qb.remove!T
+			.where(primaryKeyName!T, id);
+
+		return qb.query(this).run().rows;
+	}
+
+	bool removeAsync(T, U)(U id)
+	{
+		QueryBuilder qb;
+		qb.remove!T
+			.where(primaryKeyName!T, id);
+
+		return qb.query(this).runAsync();
+	}
+
+	int remove(T, U...)(string filter, U vals)
+	{
+		QueryBuilder qb;
+		qb.remove!T
+			.where(filter);
+
+		foreach (v; vals)
+			qb.addValue(v);
+
+		return qb.query(this).run().rows;
+	}
+
+	int removeAsync(T, U...)(string filter, U vals)
+	{
+		QueryBuilder qb;
+		qb.remove!T
+			.where(filter);
+
+		foreach (v; vals)
+			qb.addValue(v);
+
+		return qb.query(this).runAsync();
+	}
+
+
 	bool isBusy()
 	{
 		return PQisBusy(_connection) == 1;
