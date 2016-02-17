@@ -16,6 +16,13 @@ import std.conv : to;
 import std.traits;
 import std.typecons;
 
+
+version(unittest)
+{
+	import std.stdio;
+	Connection c;
+}
+
 /**
 	Represents the PostgreSQL connection and allows executing queries on it.
 
@@ -53,6 +60,13 @@ struct Connection
 			throw new DPQException(errorMessage);
 
 		_dpqLastConnection = &this;
+	}
+
+	unittest
+	{
+		c = Connection("dbname=test user=test");
+		writeln(" * Database connection with connection string");
+		assert(c.status == ConnStatusType.CONNECTION_OK);
 	}
 
 	/** Copy constructor is disabled to avoid double-freeing the PGConn pointer */
@@ -108,7 +122,7 @@ struct Connection
 		return PQport(_connection).fromStringz.to!ushort;
 	}
 
-	/**
+	/** // FIXME: BROKEN ATM
 		Executes the given string directly
 
 		Throws on fatal query errors like bad syntax
@@ -125,6 +139,25 @@ struct Connection
 		PGresult* res = PQexec(_connection, cast(const char*)command.toStringz);
 		return Result(res);
 	}
+
+	/*
+	unittest
+	{
+		auto res = c.exec("SELECT 1::INT4 AS int4, 2::INT8 AS some_long");
+		writeln(" * exec for selecting INT4 and INT8");
+		assert(res.rows == 1);
+		assert(res.columns == 2);
+
+		auto r = res[0];
+		assert(r[0].as!int == 1);
+		assert(r[0].as!long == 2);
+
+		writeln(" * Row opIndex(int) and opIndex(string) equality ");
+		assert(r[0] == r["int4"]);
+		assert(r[1] == r["some_long"]);
+
+	}
+	*/
 
 	/// ditto, async
 	bool send(string command)
@@ -151,7 +184,7 @@ struct Connection
 		See also:
 			http://www.postgresql.org/docs/9.3/static/libpq-exec.html
 	*/
-	Result execParams(T...)(string command, T params, bool async = false)
+	Result execParams(T...)(string command, T params)
 	{
 		Value[] values;
 		foreach(param; params)
@@ -160,9 +193,56 @@ struct Connection
 		return execParams(command, values);
 	}
 
+	unittest
+	{
+		auto res = c.execParams("SELECT 1::INT4 AS int4, 2::INT8 AS some_long", []);
+		writeln("\t * execParams");
+		writeln("\t\t * Rows and cols");
+
+		assert(res.rows == 1);
+		assert(res.columns == 2);
+
+		writeln("\t\t * Static values");
+		auto r = res[0];
+		assert(r[0].as!int == 1);
+		assert(r[1].as!long == 2);
+
+		writeln("\t\t * opIndex(int) and opIndex(string) equality");
+		assert(r[0] == r["int4"]);
+		assert(r[1] == r["some_long"]);
+
+		int int4 = 1;
+		long int8 = 2;
+		string str = "foo bar baz";
+		float float4 = 3.14;
+		double float8 = 3.1415;
+
+		writeln("\t\t * Passed values");
+		res = c.execParams(
+				"SELECT $1::INT4, $2::INT8, $3::TEXT, $4::FLOAT4, $5::FLOAT8",
+				int4,
+				int8,
+				str,
+				float4,
+				float8);
+
+		assert(res.rows == 1);
+		r = res[0];
+
+		assert(r[0].as!int == int4);
+		assert(r[1].as!long == int8);
+		assert(r[2].as!string == str);
+		assert(r[3].as!float == float4);
+		assert(r[4].as!double == float8);
+	}
+
 	void sendParams(T...)(string command, T params)
 	{
-		execParams(command, params, true);
+		Value[] values;
+		foreach(param; params)
+			values ~= Value(param);
+
+		execParams(command, values, true);
 	}
 
 	/// ditto, but taking an array of params, instead of variadic template
@@ -221,6 +301,19 @@ struct Connection
 	@property string errorMessage()
 	{
 		return PQerrorMessage(_connection).to!string;
+	}
+
+	unittest
+	{
+		writeln("\t * errorMessage");
+		try
+		{
+			c.execParams("SELECT_BADSYNTAX $1::INT4", 1);
+		}
+		catch {}
+
+		assert(c.errorMessage.length != 0);
+
 	}
 
 	/**
@@ -285,7 +378,8 @@ struct Connection
 						ensureSchema!tu(true);
 						cols ~= '"' ~ relationName!tu ~ '"';
 					}
-					else						cols ~= SQLType!tu;
+					else
+						cols ~= SQLType!tu;
 				}
 				
 				// Primary key
@@ -353,6 +447,39 @@ struct Connection
 		}
 	}
 
+	unittest
+	{
+		// Probably needs more thorough testing, let's assume right now
+		// everything is correct if the creating was successful.
+
+		writeln("\t * ensureSchema");
+		struct Inner
+		{
+			string innerStr;
+			int innerInt;
+		}
+
+		struct TestTable1
+		{
+			@serial8 @PK long id;
+			string str;
+			int n;
+			Inner inner;
+		}
+
+		c.ensureSchema!TestTable1;
+		
+		auto res = c.execParams(
+				"SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE tablename = $1",
+				relationName!TestTable1);
+
+		assert(res.rows == 1);
+		assert(res[0][0].as!long == 1);
+
+		c.exec("DROP TABLE " ~ relationName!TestTable1);
+		c.exec("DROP TYPE \"" ~ relationName!Inner ~ "\"");
+	}
+
 	/**
 		Returns the requested structure or a Nullable null value if no rows are returned
 
@@ -374,6 +501,40 @@ struct Connection
 	Nullable!T findOne(T, U)(U id)
 	{
 		return findOneBy!T(primaryKeyName!T, id);
+	}
+
+	unittest
+	{
+		writeln("\t * findOne(T)(U id)");
+		struct Testy
+		{
+			@serial @PK int id;
+			string foo;
+			int bar;
+			long baz;
+			int[] intArr;
+			//string[] stringArr; // TODO: string[]
+		}
+
+		c.ensureSchema!Testy;
+
+		writeln("\t\t * Null result");
+		auto shouldBeNull = c.findOne!Testy(0);
+		assert(shouldBeNull.isNull);
+
+		c.exec("INSERT INTO " ~ relationName!Testy ~ " (id, foo, bar, baz, " ~ attributeName!(Testy.intArr) ~ ") "~
+				"VALUES (1, 'somestr', 2, 3, '{1,2,3}')");
+
+		writeln("\t\t * Valid result");
+		Testy t = c.findOne!Testy(1);
+		assert(t.id == 1, `t.id == 1` );
+		assert(t.foo == "somestr", `t.foo == "somestr"`);
+		assert(t.bar == 2, `t.bar == 2`);
+		assert(t.baz == 3, `t.baz == 3`);
+		assert(t.intArr == [1,2,3], `t.intArr == [1,2,3]`);
+		//assert(t.stringArr == ["asd", "qwe"]);
+
+		c.exec("DROP TABLE " ~ relationName!Testy);
 	}
 
 	/**
