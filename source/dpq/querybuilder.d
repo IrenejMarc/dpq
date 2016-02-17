@@ -3,7 +3,8 @@ module dpq.querybuilder;
 import dpq.value;
 import dpq.query;
 import dpq.connection;
-import dpq.attributes : Column;
+import dpq.attributes;
+import dpq.column;
 
 import std.typecons;
 import std.string;
@@ -19,7 +20,8 @@ private enum QueryType
 {
 	select = "SELECT",
 	update = "UPDATE",
-	insert = "INSERT"
+	insert = "INSERT",
+	delete_ = "DELETE"
 }
 
 struct QueryBuilder
@@ -84,9 +86,17 @@ struct QueryBuilder
 
 	ref QueryBuilder from(string from)
 	{
-		assert(_type == QueryType.select, "QueryBuilder.from() can only be used for SELECT queries.");
+		assert(
+				_type == QueryType.select || _type == QueryType.delete_,
+				"QueryBuilder.from() can only be used for SELECT or DELETE queries.");
+
 		_table = from;
 		return this;
+	}
+
+	ref QueryBuilder from(T)()
+	{
+		return from(relationName!T);
 	}
 
 	ref QueryBuilder where(string filter)
@@ -98,7 +108,7 @@ struct QueryBuilder
 	ref QueryBuilder where(T)(string col, T val)
 	{
 		addParam(val);
-		_filter = "\"%s\" = $%d".format(col, _paramIndex);
+		_filter = "%s = $%d".format(col, _paramIndex);
 
 		return this;
 	}
@@ -192,6 +202,19 @@ struct QueryBuilder
 		return this;
 	}
 
+
+	ref QueryBuilder remove()
+	{
+		_type = QueryType.delete_;
+		return this;
+	}
+
+	ref QueryBuilder remove(T)()
+	{
+		from!T;
+		return remove();
+	}
+
 	ref QueryBuilder addValue(T)(T val)
 	{
 		_indexParams ~= Value(val);
@@ -265,6 +288,16 @@ struct QueryBuilder
 		return replaceParams(str);
 	}
 
+	private string deleteCommand()
+	{
+		string str = "DELETE FROM \"%s\"".format(_table);
+
+		if (_filter.length > 0)
+			str ~= " WHERE " ~ _filter;
+
+		return replaceParams(str);
+	}
+
 	@property string command()
 	{
 		final switch (_type)
@@ -275,6 +308,8 @@ struct QueryBuilder
 				return updateCommand();
 			case QueryType.insert:
 				return insertCommand();
+			case QueryType.delete_:
+				return deleteCommand();
 		}
 	}
 
