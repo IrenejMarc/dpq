@@ -68,7 +68,6 @@ struct Result
 		if (str.length > 0)
 			return str.to!int;
 		return 0;
-
 	}
 
 	@property int columns()

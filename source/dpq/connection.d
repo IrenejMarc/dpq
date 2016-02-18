@@ -505,7 +505,7 @@ struct Connection
 
 	unittest
 	{
-		writeln("\t * findOne(T)(U id)");
+		writeln("\t * findOne(T)(U id), findOneBy, findOne");
 		struct Testy
 		{
 			@serial @PK int id;
@@ -534,6 +534,10 @@ struct Connection
 		assert(t.intArr == [1,2,3], `t.intArr == [1,2,3]`);
 		//assert(t.stringArr == ["asd", "qwe"]);
 
+		writeln("\t\t * findOne with custom filter");
+		Testy t2 = c.findOne!Testy("id = $1", 1);
+		assert(t == t2);
+
 		c.exec("DROP TABLE " ~ relationName!Testy);
 	}
 
@@ -558,7 +562,7 @@ struct Connection
 	{
 		import std.stdio;
 
-		auto members = sqlMembers!T;
+		auto members = AttributeList!T;
 
 		QueryBuilder qb;
 		qb.select(members)
@@ -664,6 +668,39 @@ struct Connection
 		return res;
 	}
 
+	unittest
+	{
+		writeln("\t * find");
+
+		@relation("find_test")
+		struct Test
+		{
+			@serial @PK int id;
+			@attr("my_n") int n;
+		}
+
+		c.ensureSchema!Test;
+
+		Test t;
+		t.n = 1;
+
+		c.insert(t);
+		c.insert(t);
+		++t.n;
+		c.insert(t);
+		c.insert(t);
+		c.insert(t);
+
+		Test[] ts = c.find!Test("my_n = $1", 1);
+		assert(ts.length == 2);
+		ts = c.find!Test("my_n > 0");
+		assert(ts.length == 5);
+		ts = c.find!Test("false");
+		assert(ts.length == 0);
+
+		c.exec("DROP TABLE find_test");
+	}
+
 	int update(T, U...)(string filter, string update, U vals)
 	{
 		QueryBuilder qb;
@@ -673,6 +710,39 @@ struct Connection
 
 		auto r = qb.query(this).run(vals);
 		return r.rows;
+	}
+
+	unittest
+	{
+		writeln("\t * update");
+
+		@relation("update_test")
+		struct Test
+		{
+			@serial @PK int id;
+			int n;
+		}
+
+		c.ensureSchema!Test;
+
+		Test t;
+		t.n = 5;
+		c.insert(t);
+
+		int nUpdates = c.update!Test("n = $1", "n = $2", 5, 123);
+		assert(nUpdates == 1, `nUpdates == 1`);
+
+		t = c.findOneBy!Test("n", 123);
+		assert(t.n == 123, `t.n == 123`);
+
+		writeln("\t * async update");
+		c.updateAsync!Test("n = $1", "n = $2", 123, 6);
+		auto r = c.nextResult();
+
+		assert(r.rows == 1);
+		assert(!c.findOneBy!Test("n", 6).isNull);
+
+		c.exec("DROP TABLE update_test");
 	}
 
 	void updateAsync(T, U...)(string filter, string update, U vals)
