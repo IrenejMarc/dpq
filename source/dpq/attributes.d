@@ -186,7 +186,7 @@ template AttributeList2(T, string prefix = "", bool ignorePK = false, bool inser
 	{
 		alias mt = typeof(mixin("T." ~ fields[0]));
 
-		static if (isPK!(T, fields[0]))
+		static if (ignorePK && isPK!(T, fields[0]))
 			enum AttributeList2 = AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
 		else static if (is(mt == struct) || is(mt == class))
 		{
