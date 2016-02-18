@@ -477,7 +477,7 @@ struct Connection
 		assert(res[0][0].as!long == 1);
 
 		c.exec("DROP TABLE " ~ relationName!TestTable1);
-		c.exec("DROP TYPE \"" ~ relationName!Inner ~ "\"");
+		c.exec("DROP TYPE \"" ~ relationName!Inner ~ "\" CASCADE");
 	}
 
 	/**
@@ -735,7 +735,7 @@ struct Connection
 		t = c.findOneBy!Test("n", 123);
 		assert(t.n == 123, `t.n == 123`);
 
-		writeln("\t * async update");
+		writeln("\t\t * async");
 		c.updateAsync!Test("n = $1", "n = $2", 123, 6);
 		auto r = c.nextResult();
 
@@ -775,6 +775,28 @@ struct Connection
 		return r.rows;
 	}
 
+	unittest
+	{
+		writeln("\t * update with AA updates");
+
+		@relation("update_aa_test")
+		struct Test
+		{
+			@serial @PK int id;
+			int n;
+		}
+		c.ensureSchema!Test;
+
+		Test t;
+		t.n = 1;
+		c.insert(t);
+
+		int rows = c.update!Test(1, ["n": Value(2)]);
+		assert(rows == 1, `r.rows == 1`);
+
+		c.exec("DROP TABLE update_aa_test");
+	}
+
 	void updateAsync(T, U)(U id, Value[string] updates)
 	{
 		update!T(id, updates, true);
@@ -789,8 +811,8 @@ struct Connection
 		qb.update(relationName!T)
 			.where(primaryKeyName!T, id);
 
-		foreach (m; AttributeList!(T, true))
-			qb.set(attributeName!(mixin("T." ~ m), __traits(getMember, updates, m)));
+		foreach (m; serialisableMembers!T)
+			qb.set(attributeName!(mixin("T." ~ m)), __traits(getMember, updates, m));
 
 		auto q = qb.query(this);
 		if (async)
@@ -803,9 +825,43 @@ struct Connection
 		return r.rows;
 	}
 
+	unittest
+	{
+		writeln("\t * update with object");
+		
+		@relation("update_object_test")
+		struct Test
+		{
+			@serial @PK int id;
+			int n;
+		}
+		c.ensureSchema!Test;
+
+		Test t;
+		t.n = 1;
+		t.id = 1; // assumptions <3
+
+		c.insert(t);
+
+		t.n = 2;
+		c.update!Test(1, t);
+		
+		t = c.findOne!Test(1);
+		assert(t.n == 2);
+
+		t.n = 3;
+		c.updateAsync!Test(1, t);
+		auto r = c.nextResult();
+
+		writeln("\t\t * async");
+		assert(r.rows == 1);
+
+		c.exec("DROP TABLE update_object_test");
+	}
+
 	void updateAsync(T, U)(U id, T updates)
 	{
-		update(id, T, true);
+		update!T(id, updates, true);
 	}
 
 	bool insert(T)(T val, bool async = false)
@@ -835,6 +891,36 @@ struct Connection
 
 		auto r = qb.query(this).run();
 		return r.rows > 0;
+	}
+
+	unittest
+	{
+		@relation("insert_test_inner")
+		struct Inner
+		{
+			int bar;
+		}
+
+		@relation("insert_test")
+		struct Test
+		{
+			int n;
+			Inner foo;
+		}
+		c.ensureSchema!Test;
+
+		Test t;
+		t.n = 1;
+		t.foo.bar = 2;
+		
+		auto r = c.insert(t);
+		assert(r == true);
+
+		Test t2 = c.findOneBy!Test("n", 1);
+		assert(t2 == t);
+
+		c.exec("DROP TABLE insert_test");
+		c.exec("DROP TYPE \"%s\" CASCADE".format(relationName!Inner));
 	}
 
 	void insertAsync(T)(T val)
