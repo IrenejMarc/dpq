@@ -176,18 +176,22 @@ string embeddedPrefix(T)()
 }
 
 
-template AttributeList2(T, string prefix = "", bool ignorePK = false, bool insert = false, fields...)
+template AttributeList2(
+		T,
+		string prefix = "",
+		string asPrefix = "",
+		bool ignorePK = false,
+		bool insert = false,
+		fields...)
 {
 	static if (fields.length == 0)
-	{
 		enum AttributeList2 = [];
-	}
 	else
 	{
 		alias mt = typeof(mixin("T." ~ fields[0]));
 
 		static if (ignorePK && isPK!(T, fields[0]))
-			enum AttributeList2 = AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
+			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
 		else static if (is(mt == struct) || is(mt == class))
 		{
 			static if (insert)
@@ -195,23 +199,36 @@ template AttributeList2(T, string prefix = "", bool ignorePK = false, bool inser
 			else
 				enum pref = "(\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\").";
 
+			alias mType = typeof(mixin("T." ~ fields[0]));
 			enum AttributeList2 = AttributeList2!(
-					typeof(mixin("T." ~ fields[0])),
-					pref ~ prefix, 
+					mType,
+					pref ~ prefix,
+					embeddedPrefix!mType ~ asPrefix,
 					ignorePK,
 					insert,
 					serialisableMembers!(typeof(mixin("T." ~ fields[0])))) ~
-			AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
+			AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
 		}
 		else
-			enum AttributeList2 = [Column(prefix ~ attributeName!(mixin("T." ~ fields[0])))] ~ AttributeList2!(T, prefix, ignorePK, insert, fields[1 .. $]);
+		{
+			enum attrName = attributeName!(mixin("T." ~ fields[0]));
+			enum AttributeList2 = 
+					[Column(prefix ~ attrName, asPrefix ~ attrName)] ~ 
+					AttributeList2!(
+							T,
+							prefix,
+							asPrefix,
+							ignorePK,
+							insert,
+							fields[1 .. $]);
+		}
 	}
 
 }
 
 template AttributeList(T, bool ignorePK = false, bool insert = false)
 {
-	alias AttributeList = AttributeList2!(T, "", ignorePK, insert, serialisableMembers!(T));
+	alias AttributeList = AttributeList2!(T, "", "", ignorePK, insert, serialisableMembers!(T));
 }
 
 deprecated("Use compile-time AttributeList!T instead")
