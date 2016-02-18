@@ -53,7 +53,22 @@ struct Result
 
 	@property int rows()
 	{
-		return PQntuples(_result);
+		int n = PQntuples(_result);
+
+		auto str = PQcmdTuples(_result).fromStringz;
+		if (n == 0 && str.length > 0)
+			return str.to!int();
+
+		return n;
+	}
+
+	@property int cmdTuples()
+	{
+		auto str = PQcmdTuples(_result).fromStringz;
+		if (str.length > 0)
+			return str.to!int;
+		return 0;
+
 	}
 
 	@property int columns()
