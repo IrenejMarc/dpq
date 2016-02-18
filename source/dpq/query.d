@@ -3,7 +3,6 @@ module dpq.query;
 import dpq.connection;
 import dpq.value;
 import dpq.exception;
-import dpq.value;
 import dpq.result;
 
 struct Query
