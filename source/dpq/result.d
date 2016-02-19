@@ -12,18 +12,63 @@ import dpq.value;
 import dpq.exception;
 import dpq.pgarray;
 
+class ResultPtr
+{
+	PGresult* _result;
+	alias get this;
+
+	this(PGresult* res)
+	{
+		_result = res;
+	}
+
+	~this()
+	{
+		clear();
+	}
+
+	@property PGresult* get()
+	{
+		if (_result is null)
+			throw new DPQException("get called on a null ResultPtr");
+		return _result;
+	}
+
+	@property bool isNull()
+	{
+		return _result == null;
+	}
+
+	void opAssign(typeof(null) n)
+	{
+		clear();
+	}
+
+	void opAssign(PGresult* res)
+	{
+		_result = res;
+	}
+
+	void clear()
+	{
+		if (_result != null)
+			PQclear(_result);
+		_result = null;
+	}
+}
+
 struct Result
 {
-	private PGresult* _result;
+	private ResultPtr _result;
 	private TickDuration _time;
 
-	@disable this(this);
+	//@disable this(this);
 
 	this(PGresult* res)
 	{
 		if (res == null)
 		{
-			_result = null;
+			_result = new ResultPtr(null);
 			return;
 		}
 
@@ -42,13 +87,7 @@ struct Result
 				break;
 		}
 
-		_result = res;
-	}
-
-	~this()
-	{
-		PQclear(_result);
-		_result = null;
+		_result = new ResultPtr(res);
 	}
 
 	@property int rows()
@@ -138,7 +177,12 @@ struct Result
 	T opCast(T)()
 			if (is(T == bool))
 	{
-		return _result != null;
+		return !isNull();
+	}
+
+	@property bool isNull()
+	{
+		return _result.isNull();
 	}
 }
 
