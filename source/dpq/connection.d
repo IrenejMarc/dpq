@@ -1111,7 +1111,7 @@ struct Connection
 		assert(r[0][0].as!int == int2);
 	}
 
-	ref PreparedStatement prepare(T...)(string name, string command, T paramTypes)
+	Result prepare(T...)(string name, string command, T paramTypes)
 	{
 		Oid[] oids;
 		foreach (pType; paramTypes)
@@ -1175,6 +1175,27 @@ struct Connection
 			vals ~= Value(p);
 
 		return sendPrepared(name, vals);
+	}
+
+	unittest
+	{
+		writeln("\t * prepare");
+		// The result of this isn't really all that useful, but as long as it 
+		// throws on errors, it kinda is
+		c.prepare("prepare_test", "SELECT $1", Type.INT4);
+
+		writeln("\t * execPrepared");
+		auto r = c.execPrepared("prepare_test", 1);
+		assert(r.rows == 1);
+		assert(r[0][0].as!int == 1);
+
+		writeln("\t\t * sendPrepared");
+		bool s = c.sendPrepared("prepare_test", 1);
+		assert(s);
+
+		r = c.lastResult();
+		assert(r.rows == 1);
+		assert(r[0][0].as!int == 1);
 	}
 	
 	ref PreparedStatement prepared(string name)
