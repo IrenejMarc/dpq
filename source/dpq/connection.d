@@ -403,7 +403,6 @@ struct Connection
 				// Foreign key
 				else static if (hasUDA!(mixin("type." ~ m), ForeignKeyAttribute))
 				{
-//ALTER TABLE distributors ADD CONSTRAINT distfk FOREIGN KEY (address) REFERENCES addresses (address) MATCH FULL;
 					enum uda = getUDAs!(mixin("type." ~ m), ForeignKeyAttribute)[0];
 					additional ~= 
 						"ALTER TABLE \"%s\" ADD CONSTRAINT \"%s\" FOREIGN KEY (\"%s\") REFERENCES \"%s\" (\"%s\")".format(
