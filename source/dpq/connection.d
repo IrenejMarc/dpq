@@ -895,6 +895,8 @@ struct Connection
 
 	unittest
 	{
+		writeln("\t * insert");
+
 		@relation("insert_test_inner")
 		struct Inner
 		{
@@ -918,6 +920,13 @@ struct Connection
 
 		Test t2 = c.findOneBy!Test("n", 1);
 		assert(t2 == t);
+
+		writeln("\t\t * async");
+		t.n = 123;
+		c.insertAsync(t);
+		
+		auto res = c.nextResult();
+		assert(res.rows == 1);
 
 		c.exec("DROP TABLE insert_test");
 		c.exec("DROP TYPE \"%s\" CASCADE".format(relationName!Inner));
@@ -943,8 +952,9 @@ struct Connection
 		qb.remove!T
 			.where(primaryKeyName!T, id);
 
-		return qb.query(this).runAsync();
+		return qb.query(this).runAsync() == 1;
 	}
+
 
 	int remove(T, U...)(string filter, U vals)
 	{
@@ -958,7 +968,7 @@ struct Connection
 		return qb.query(this).run().rows;
 	}
 
-	int removeAsync(T, U...)(string filter, U vals)
+	bool removeAsync(T, U...)(string filter, U vals)
 	{
 		QueryBuilder qb;
 		qb.remove!T
@@ -967,7 +977,42 @@ struct Connection
 		foreach (v; vals)
 			qb.addValue(v);
 
-		return qb.query(this).runAsync();
+		return qb.query(this).runAsync() == 1;
+	}
+
+	unittest
+	{
+		@relation("remove_test")
+		struct Test
+		{
+			@serial @PK int id;
+			int n;
+		}
+		c.ensureSchema!Test;
+
+		foreach (i; 0 .. 10)
+			c.insert(Test(0, i));
+
+		writeln("\t * remove(id)");
+		int n = c.remove!Test(1);
+		assert(n == 1, `n == 1`);
+
+
+		writeln("\t\t * async");
+		c.removeAsync!Test(2);
+		auto r = c.nextResult();
+		assert(r.rows == 1, `r.rows == 1`);
+
+		writeln("\t * remove(filter, vals...)");
+		n = c.remove!Test("id IN($1,$2,$3,$4,$5)", 3, 4, 5, 6, 7);
+		assert(n == 5);
+
+		writeln("\t\t * async");
+		c.removeAsync!Test("id >= $1", 7);
+		r = c.nextResult();
+		assert(r.rows == 3);
+
+		c.exec("DROP TABLE remove_test");
 	}
 
 
@@ -976,28 +1021,97 @@ struct Connection
 		return PQisBusy(_connection) == 1;
 	}
 
+	unittest
+	{
+		writeln("\t * isBusy");
+
+		assert(c.isBusy() == false);
+
+		c.send("SELECT 1::INT");
+
+		assert(c.isBusy() == true);
+
+		c.nextResult();
+		assert(c.isBusy() == false);
+	}
+
 
 	/**
 		 Blocks until a result is read, then returns it
 
 		 If no more results remain, a null result will be returned
+
+		 Make sure to call this until a null is returned.
 	*/
 	Result nextResult()
 	{
 		import core.thread;
 
+		/*
 		do
 		{
 			PQconsumeInput(_connection);
-			Thread.sleep(dur!"msecs"(1)); // What's a reasonable amount of time to wait?
+			//Thread.sleep(dur!"msecs"(1)); // What's a reasonable amount of time to wait?
 		}
 		while (isBusy());
+		*/
 
 		PGresult* res = PQgetResult(_connection);
 		return Result(res);
 	}
 
-	Result prepare(T...)(string name, string command, T paramTypes)
+	Result[] allResults()
+	{
+		Result[] res;
+		
+		PGresult* r;
+		while ((r = PQgetResult(_connection)) != null)
+			res ~= Result(r);
+
+		return res;
+	}
+	
+	Result lastResult()
+	{
+		Result res;
+
+		PGresult* r;
+		while ((r = PQgetResult(_connection)) != null)
+			res = Result(r);
+
+		return res;
+	}
+
+	unittest
+	{
+		writeln("\t * nextResult");
+		auto x = c.nextResult();
+		assert(x.isNull);
+
+		int int1 = 1;
+		int int2 = 2;
+
+		c.sendParams("SELECT $1", int1);
+
+		// In every way the same as lastResult
+		Result r, t;
+		while(!(t = c.nextResult()).isNull)
+			r = t;
+
+		assert(r.rows == 1);
+		assert(r.columns == 1);
+		assert(r[0][0].as!int == int1);
+
+		writeln("\t * lastResult");
+		c.sendParams("SELECT $1", int2);
+		r = c.lastResult();
+
+		assert(r.rows == 1);
+		assert(r.columns == 1);
+		assert(r[0][0].as!int == int2);
+	}
+
+	ref PreparedStatement prepare(T...)(string name, string command, T paramTypes)
 	{
 		Oid[] oids;
 		foreach (pType; paramTypes)
