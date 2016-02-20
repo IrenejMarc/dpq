@@ -3,6 +3,7 @@ module dpq.value;
 import dpq.result;
 import dpq.exception;
 import dpq.pgarray;
+import dpq.meta;
 
 import derelict.pq.pq;
 
@@ -12,6 +13,8 @@ import std.conv : to;
 import std.typecons : Nullable;
 import std.bitmanip;
 import std.traits;
+
+version(unittest) import std.stdio;
 
 package enum Type : Oid
 {
@@ -166,7 +169,9 @@ struct Value
 
 	void opAssign(string val)
 	{
-		_valueBytes = cast(ubyte[])val.dup;
+		import std.string;
+
+		_valueBytes = val.representation.dup;
 		_size = _valueBytes.length.to!int;
 		_type = Type.TEXT;
 	}
@@ -176,6 +181,39 @@ struct Value
 		_valueBytes = val._valueBytes;
 		_size = val._size;
 		_type = val._type;
+	}
+
+	unittest
+	{
+		import std.string;
+
+		writeln(" * value");
+		writeln("\t * opAssign");
+
+		int a = 0xFFFF_FFFF;
+		Value v;
+		v.opAssign(a);
+
+		assert(v._size == 4);
+		assert(v._valueBytes == [255, 255, 255, 255]);
+		assert(v._type == Type.INT4);
+		
+		int[][] b = [[1], [2]];
+		auto pga = PGArray(b);
+
+		v.opAssign(b);
+		assert(v._size == pga.toBytes().length);
+		assert(v._valueBytes == pga.toBytes());
+
+		string str = "some string, I don't even know.";
+		v.opAssign(str);
+
+		assert(v._valueBytes == str.representation);
+		assert(v.size == str.representation.length);
+
+		Value v2;
+		v.opAssign(v2);
+		assert(v2 == v);
 	}
 
 	@property int size()
@@ -201,68 +239,92 @@ struct Value
 		const(ubyte)[] data = _valueBytes[0 .. _size];
 		return fromBytes!T(data, _size);
 	}
+
+	unittest
+	{
+		writeln("\t * as");
+
+		Value v = "123";
+		assert(v.as!string == "123");
+
+		v = 123;
+		assert(v.as!int == 123);
+
+		v = [[1, 2], [3, 4]];
+		assert(v.as!(int[][]) == [[1, 2],[3, 4]]);
+	}
 }
 
-
-
-
-
-Type typeOid(T)()
+template typeOid(T)
 {
 		alias TU = std.typecons.Unqual!T;
-
-		static if (is(TU == int))
-			return Type.INT4;
-		else static if (is(TU == int[]))
-			return Type.INT4ARRAY;
-		else static if (is(TU == long))
-			return Type.INT8;
-		//else static if (is(TU == long[]))
-		//	return Type.INT8ARRAY;
-		else static if (is(TU == bool))
-			return Type.BOOL;
-		//else static if (is(TU == bool[]))
-		//	return Type.;
-		else static if (is(TU == byte))
-			return Type.INT2;
-		else static if (is(TU == byte[]) || is(TU == ubyte[]))
-			return Type.BYTEA;
-		else static if (is(TU == char))
-			return Type.CHAR;
-		else static if (is(TU == char[]))
-			return Type.TEXT;
-		else static if (is(TU == short))
-			return Type.INT2;
-		else static if (is(TU == short[]))
-			return Type.INT2ARRAY;
-		else static if (is(TU == float))
-			return Type.FLOAT4;
-		else static if (is(TU == float[]))
-			return Type.FLOAT4ARRAY;
-		else static if (is(TU == double))
-			return Type.FLOAT8;
-
-		/**
-			Since unsigned types are not supported by PostgreSQL, we use signed
-			types for them. Transfer and representation in D will still work correctly,
-			but SELECTing them in the psql console, or as a string might result in 
-			a negative number.
-
-			It is recommended not to use unsigned types in structures, that will
-			be used in the DB directly.
-		*/
-		else static if (is(TU == ulong))
-			return Type.INT8;
-		else static if (is(TU == uint))
-			return Type.INT4;
-		else static if (is(TU == ushort) || is(TU == char))
-			return Type.INT2;
-		else static if (is(TU == ubyte))
-			return Type.CHAR;
-		
+		static if (isArray!T && !isSomeString!T)
+		{
+			alias BT = BaseType!T;
+			static if (is(BT == int))
+				enum typeOid = Type.INT4ARRAY;
+			else static if (is(BT == short))
+				enum typeOid = Type.INT2ARRAY;
+			else static if (is(BT == float))
+				enum typeOid = Type.FLOAT4ARRAY;
+			else static if (is(BT == byte) || is (BT == ubyte))
+				enum typeOid = Type.BYTEA;
+			else
+				static assert(false, "Cannot map array type " ~ T.stringof ~ " to Oid");
+		}
 		else
-			// Try to infer
-			return Type.INFER;
+		{
+			static if (is(TU == int))
+				enum typeOid = Type.INT4;
+			else static if (is(TU == long))
+				enum typeOid = Type.INT8;
+			else static if (is(TU == bool))
+				enum typeOid = Type.BOOL;
+			else static if (is(TU == byte))
+				enum typeOid = Type.CHAR;
+			else static if (is(TU == char))
+				enum typeOid = Type.CHAR;
+			else static if (isSomeString!TU)
+				enum typeOid = Type.TEXT;
+			else static if (is(TU == short))
+				enum typeOid = Type.INT2;
+			else static if (is(TU == float))
+				enum typeOid = Type.FLOAT4;
+			else static if (is(TU == double))
+				enum typeOid = Type.FLOAT8;
+
+			/**
+				Since unsigned types are not supported by PostgreSQL, we use signed
+				types for them. Transfer and representation in D will still work correctly,
+				but SELECTing them in the psql console, or as a string might result in 
+				a negative number.
+
+				It is recommended not to use unsigned types in structures, that will
+				be used in the DB directly.
+			*/
+			else static if (is(TU == ulong))
+				enum typeOid = Type.INT8;
+			else static if (is(TU == uint))
+				enum typeOid = Type.INT4;
+			else static if (is(TU == ushort) || is(TU == char))
+				enum typeOid = Type.INT2;
+			else static if (is(TU == ubyte))
+				enum typeOid = Type.CHAR;
+			else
+				// Try to infer
+				enum typeOid = Type.INFER;
+		}
+}
+
+unittest
+{
+	writeln("\t * typeOid");
+
+	static assert(typeOid!int == Type.INT4, "int");
+	static assert(typeOid!string == Type.TEXT, "string");
+	static assert(typeOid!(int[]) == Type.INT4ARRAY, "int[]");
+	static assert(typeOid!(int[][]) == Type.INT4ARRAY, "int[][]");
+	static assert(typeOid!(ubyte[]) == Type.BYTEA, "ubyte[]");
 }
 
 Oid[] paramTypes(Value[] values)
