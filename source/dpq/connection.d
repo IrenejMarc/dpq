@@ -193,6 +193,16 @@ struct Connection
 		return execParams(command, values);
 	}
 
+
+	void sendParams(T...)(string command, T params)
+	{
+		Value[] values;
+		foreach(param; params)
+			values ~= Value(param);
+
+		execParams(command, values, true);
+	}
+
 	unittest
 	{
 		auto res = c.execParams("SELECT 1::INT4 AS int4, 2::INT8 AS some_long", []);
@@ -234,15 +244,6 @@ struct Connection
 		assert(r[2].as!string == str);
 		assert(r[3].as!float == float4);
 		assert(r[4].as!double == float8);
-	}
-
-	void sendParams(T...)(string command, T params)
-	{
-		Value[] values;
-		foreach(param; params)
-			values ~= Value(param);
-
-		execParams(command, values, true);
 	}
 
 	/// ditto, but taking an array of params, instead of variadic template
@@ -654,7 +655,7 @@ struct Connection
 	T[] find(T, U...)(string filter = "", U vals = U.init)
 	{
 		QueryBuilder qb;
-		qb.select(sqlMembers!T)
+		qb.select(AttributeList!T)
 			.from(relationName!T)
 			.where(filter);
 
