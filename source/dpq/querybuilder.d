@@ -549,6 +549,18 @@ struct QueryBuilder
 		return replaceParams(str);
 	}
 
+	unittest
+	{
+		writeln("\t * deleteCommand");
+
+		QueryBuilder qb;
+		qb.remove("table")
+			.where("id", 1);
+
+		string str = qb.command();
+		assert(str == `DELETE FROM "table" WHERE id = $1`);
+	}
+
 	@property string command()
 	{
 		final switch (_type)
@@ -576,10 +588,44 @@ struct QueryBuilder
 		return res;
 	}
 
+	unittest
+	{
+		writeln("\t * paramsArr");
+
+		QueryBuilder qb;
+		qb.addParams("1", "2", "3");
+		qb["foo"] = 1;
+		qb["bar"] = 2;
+
+		auto ps = qb.paramsArr();
+		assert(
+				ps == [Value("1"), Value("2"), Value("3"), Value(1), Value(2)] ||
+				ps == [Value("1"), Value("2"), Value("3"), Value(2), Value(1)]);
+	}
+
 	void addParam(T)(T val)
 	{
 		_indexParams ~= Value(val);
 		++_paramIndex;
+	}
+
+	unittest
+	{
+		writeln("\t * addParam");
+
+		QueryBuilder qb;
+
+		assert(qb._paramIndex == 0);
+
+		qb.addParam(1);
+		assert(qb._paramIndex == 1);
+		assert(qb._indexParams.length == 1);
+		assert(qb._indexParams[0] == Value(1));
+
+		qb.addParam(2);
+		assert(qb._paramIndex == 2);
+		assert(qb._indexParams.length == 2);
+		assert(qb._indexParams[1] == Value(2));
 	}
 
 	ref QueryBuilder addParams(T...)(T vals)
@@ -589,13 +635,22 @@ struct QueryBuilder
 
 		return this;
 	}
+	
+	unittest
+	{
+		writeln("\t * addParams");
+
+		QueryBuilder qb;
+		qb.addParams(1, 2, 3);
+
+		assert(qb._indexParams.length == 3);
+		assert(qb._paramIndex == 3);
+	}
 
 	ref QueryBuilder opBinary(string op, T)(T val)
 			if (op == "<<")
 	{
-		addParam(val);
-
-		return this;
+		return addParam(val);
 	}
 
 
