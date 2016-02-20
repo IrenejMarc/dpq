@@ -315,10 +315,32 @@ struct QueryBuilder
 		return this;
 	}
 
+
 	ref QueryBuilder insert(string table, Column[] cols...)
 	{
 		import std.array;
 		return insert(table, array(cols.map!(c => c.column)));
+	}
+
+	unittest
+	{
+		writeln("\t * insert");
+
+		QueryBuilder qb;
+		qb.insert("table", "col1", "col2");
+
+		assert(qb._type == QueryType.insert);
+		assert(qb._table == "table");
+		assert(qb._columns == ["col1", "col2"]);
+
+		Column[] cs = [
+			Column("some_col", "stupid_as_name"),
+			Column("qwe")];
+
+		qb.insert("table2", cs);
+		assert(qb._table == "table2");
+		assert(qb._columns.length == 2);
+		assert(qb._columns == ["some_col", "qwe"]);
 	}
 
 	ref QueryBuilder values(T...)(T vals)
@@ -341,6 +363,22 @@ struct QueryBuilder
 		return this;
 	}
 
+	unittest
+	{
+		writeln("\t * values");
+
+		QueryBuilder qb;
+		qb.insert("table", "col")
+			.values(1, 2, 3);
+
+		assert(qb._type == QueryType.insert);
+		assert(qb._indexParams.length == 3);
+		assert(qb._indexParams == [Value(1), Value(2), Value(3)]);
+
+		qb.values([Value(4), Value(5)]);
+		assert(qb._indexParams.length == 5);
+		assert(qb._indexParams == [Value(1), Value(2), Value(3), Value(4), Value(5)]);
+	}
 
 	ref QueryBuilder remove()
 	{
@@ -348,10 +386,27 @@ struct QueryBuilder
 		return this;
 	}
 
+	ref QueryBuilder remove(string table)
+	{
+		from(table);
+		return remove();
+	}
+
 	ref QueryBuilder remove(T)()
 	{
-		from!T;
-		return remove();
+		return remove(relationName!T);
+	}
+
+	unittest
+	{
+		writeln("\t * remove");
+
+		struct Test {}
+		QueryBuilder qb;
+		qb.remove!Test;
+
+		assert(qb._type == QueryType.delete_);
+		assert(qb._table == relationName!Test);
 	}
 
 	ref QueryBuilder addValue(T)(T val)
@@ -370,6 +425,22 @@ struct QueryBuilder
 			str = str.replace("{" ~ param ~ "}", "$%d".format(++index));
 
 		return str;
+	}
+
+	unittest
+	{
+		writeln("\t * replaceParams");
+		QueryBuilder qb;
+		string str = "SELECT {foo} FROM table WHERE id = {bar} AND name = '{baz}'";
+		qb["foo"] = "a";
+		qb["bar"] = "b";
+
+		str = qb.replaceParams(str);
+
+		// No idea what the order might be
+		assert(
+				str == "SELECT $1 FROM table WHERE id = $2 AND name = '{baz}'" ||
+				str == "SELECT $2 FROM table WHERE id = $1 AND name = '{baz}'");
 	}
 
 	private string selectCommand()
@@ -402,6 +473,21 @@ struct QueryBuilder
 		return replaceParams(str);
 	}
 
+	unittest
+	{
+		writeln("\t * selectCommand");
+
+		QueryBuilder qb;
+		qb.select("col")
+			.from("table")
+			.where("id", 1)
+			.limit(1)
+			.offset(1);
+
+		string str = qb.command();
+		assert(str == `SELECT col FROM "table" WHERE id = $1 LIMIT 1 OFFSET 1`, str);
+	}
+
 	private string insertCommand()
 	{
 		int index = 0;
@@ -414,9 +500,20 @@ struct QueryBuilder
 		return str;
 	}
 
+	unittest
+	{
+		writeln("\t * insertCommand");
+
+		QueryBuilder qb;
+		qb.insert("table", "col")
+			.values(1);
+
+		string str = qb.command();
+		assert(str == `INSERT INTO "table" (col) VALUES ($1)`);
+	}
+
 	private string updateCommand()
 	{
-
 		string str = "UPDATE \"%s\" SET %s".format(
 				_table,
 				_set.join(", "));
@@ -425,6 +522,21 @@ struct QueryBuilder
 			str ~= " WHERE " ~ _filter;
 
 		return replaceParams(str);
+	}
+
+	unittest
+	{
+		writeln("\t * updateCommand");
+
+		QueryBuilder qb;
+		qb.update("table")
+			.set("col", 1)
+			.where("foo", 2);
+
+		string str = qb.command();
+		assert(
+				str == `UPDATE "table" SET "col" = $1 WHERE foo = $2` ||
+				str == `UPDATE "table" SET "col" = $2 WHERE foo = $1`);
 	}
 
 	private string deleteCommand()
