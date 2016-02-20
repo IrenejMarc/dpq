@@ -9,6 +9,8 @@ import dpq.column;
 import std.typecons;
 import std.string;
 
+version (unittest) import std.stdio;
+
 
 enum Order : string
 {
@@ -47,7 +49,6 @@ struct QueryBuilder
 		int _paramIndex = 0;
 		QueryType _type;
 		Connection* _connection;
-
 	}
 
 	this(ref Connection connection)
@@ -60,13 +61,27 @@ struct QueryBuilder
 		_params[key] = val;
 	}
 
+	unittest
+	{
+		writeln(" * QueryBuilder");
+		writeln("\t * opIndexAssign");
+
+		QueryBuilder qb;
+		qb["foo"] = 123;
+		qb["bar"] = "456";
+
+		assert(qb._params["foo"] == Value(123));
+		assert(qb._params["bar"] == Value("456"));
+	}
+
 	// SELECT methods
 	ref QueryBuilder select(string[] cols...)
 	{
-		_columns = cols;		
+		_columns = cols;
 		_type = QueryType.select;
 		return this;
 	}
+
 
 	ref QueryBuilder select(Column[] cols...)
 	{
@@ -80,8 +95,20 @@ struct QueryBuilder
 				_columns ~= col.column;
 		}
 
-
 		return this;
+	}
+
+	unittest
+	{
+		writeln("\t * select");
+
+		QueryBuilder qb;
+		qb.select("foo", "bar", "baz");
+		assert(qb._columns == ["foo", "bar", "baz"]);
+
+		Column[] cs = [Column("foo", "foo_test"), Column("bar")];
+		qb.select(cs);
+		assert(qb._columns == ["foo AS foo_test", "bar"]);
 	}
 
 	ref QueryBuilder from(string from)
@@ -99,6 +126,19 @@ struct QueryBuilder
 		return from(relationName!T);
 	}
 
+	unittest
+	{
+		writeln("\t\t * from");
+		QueryBuilder qb;
+		
+		qb.from("sometable");
+		assert(qb._table == "sometable");
+
+		struct Test {}
+		qb.from!Test;
+		assert(qb._table == "test");
+	}
+
 	ref QueryBuilder where(string filter)
 	{
 		_filter = filter;
@@ -107,10 +147,24 @@ struct QueryBuilder
 
 	ref QueryBuilder where(T)(string col, T val)
 	{
-		addParam(val);
-		_filter = "%s = $%d".format(col, _paramIndex);
+		_params["__where_filt"] = Value(val);
+		_filter = "%s = {__where_filt}".format(col);
 
 		return this;
+	}
+
+	unittest
+	{
+		writeln("\t\t * where");
+
+		string str = "a = $1 AND b = $2";
+		QueryBuilder qb;
+		qb.where(str);
+		assert(qb._filter == str);
+
+		qb.where("some_field", 1);
+		assert(qb._filter == "some_field = {__where_filt}");
+		assert(qb._params["__where_filt"] == Value(1));
 	}
 
 	ref QueryBuilder order(string col, Order order)
@@ -119,6 +173,23 @@ struct QueryBuilder
 		_orderBy ~= col;
 		_orders ~= order;
 		return this;
+	}
+
+	unittest
+	{
+		writeln("\t\t * order");
+
+		QueryBuilder qb;
+
+		qb.order("some_col", Order.asc);
+
+		assert(qb._orderBy[0] == "some_col");
+		assert(qb._orders[0] == Order.asc);
+
+		qb.order("some_other_col", Order.desc);
+
+		assert(qb._orderBy[1] == "some_other_col");
+		assert(qb._orders[1] == Order.desc);
 	}
 	
 	ref QueryBuilder limit(int limit)
@@ -129,11 +200,29 @@ struct QueryBuilder
 		return this;
 	}
 
+	unittest
+	{
+		writeln("\t\t * limit");
+
+		QueryBuilder qb;
+		qb.limit(1);
+		assert(qb._limit == 1);
+	}
+
 	ref QueryBuilder offset(int offset)
 	{
 		assert(_type == QueryType.select, "QueryBuilder.offset() can only be used for SELECT queries.");
 		_offset = offset;
 		return this;
+	}
+
+	unittest
+	{
+		writeln("\t\t * offset");
+
+		QueryBuilder qb;
+		qb.offset(1);
+		assert(qb._offset == 1);
 	}
 
 	// UPDATE methods
@@ -142,6 +231,26 @@ struct QueryBuilder
 		_table = table;
 		_type = QueryType.update;
 		return this;
+	}
+	
+	ref QueryBuilder update(T)()
+	{
+		return update(relationName!T);
+	}
+
+	unittest
+	{
+		QueryBuilder qb;
+		qb.update("sometable");
+
+		assert(qb._table == "sometable");
+		assert(qb._type == QueryType.update);
+
+		struct Test {}
+
+		qb.update!Test;
+		assert(qb._type == QueryType.update);
+		assert(qb._table == relationName!Test);
 	}
 
 	ref QueryBuilder set(Value[string] params)
@@ -154,6 +263,8 @@ struct QueryBuilder
 
 	ref QueryBuilder set(T)(string col, T val)
 	{
+		assert(_type == QueryType.update, "QueryBuilder.set() can only be used on UPDATE queries");
+
 		_params[col] = val;
 		_set ~= "\"%s\" = {%s}".format(col, col);
 
@@ -165,6 +276,34 @@ struct QueryBuilder
 		_set ~= set;
 
 		return this;
+	}
+
+	unittest
+	{
+		writeln("\t * set");
+
+		QueryBuilder qb;
+		qb.update("foo")
+			.set("some_col", 1);
+
+		assert(qb._params["some_col"] == Value(1));
+		assert(qb._set.length == 1);
+		assert(qb._set[0] == "\"some_col\" = {some_col}");
+
+		qb.set([
+				"col1": Value(1),
+				"col2": Value(2)]);
+
+		assert(qb._params.length == 3);
+		assert(qb._set.length == 3);
+		assert(qb._set[1] == "\"col1\" = {col1}");
+		assert(qb._set[2] == "\"col2\" = {col2}");
+
+		string str = "asd = $1";
+		qb.set(str);
+		assert(qb._params.length == 3);
+		assert(qb._set.length == 4);
+		assert(qb._set[3] == str);
 	}
 	
 	// INSERT methods
