@@ -6,6 +6,11 @@ import std.typecons;
 
 import dpq.column;
 
+version(unittest)
+{
+	import std.stdio;
+}
+
 RelationAttribute relation(string name)
 {
 	return RelationAttribute(name);
@@ -103,14 +108,6 @@ struct ForeignKeyAttribute
 alias FK = foreignKey;
 alias FKey = foreignKey;
 
-template relationName(alias R)
-{
-	static if (hasUDA!(R, RelationAttribute))
-		enum relationName = getUDAs!(R, RelationAttribute)[0].name;
-	else
-		enum relationName = SnakeCase!(R.stringof);
-}
-
 template SnakeCase(string str)
 {
 	import std.string : toLower;
@@ -138,12 +135,62 @@ template SnakeCase(string str)
 	enum SnakeCase = Snake!str.toLower;
 }
 
+unittest
+{
+	writeln(" * Attributes");
+	writeln("\t * SnakeCase");
+
+	static assert(SnakeCase!"something" == "something");
+	static assert(SnakeCase!"UPPERCASE" == "uppercase");
+	static assert(SnakeCase!"camelCase" == "camel_case");
+	static assert(SnakeCase!"UpperCamelCase" == "upper_camel_case");
+	static assert(SnakeCase!"someTHING" == "some_thing");
+	static assert(SnakeCase!"some_thing" == "some_thing");
+}
+
+template relationName(alias R)
+{
+	static if (hasUDA!(R, RelationAttribute))
+		enum relationName = getUDAs!(R, RelationAttribute)[0].name;
+	else
+		enum relationName = SnakeCase!(R.stringof);
+}
+
+unittest
+{
+	writeln("\t * relationName");
+
+	struct Test {}
+	struct someThing {}
+	@relation("some_random_name") struct Test2 {}
+
+	static assert(relationName!Test == "test");
+	static assert(relationName!someThing == "some_thing");
+	static assert(relationName!Test2 == "some_random_name");
+}
+
+
 template attributeName(alias R)
 {
 	static if (hasUDA!(R, AttributeAttribute))
 		enum attributeName = getUDAs!(R, AttributeAttribute)[0].name;
 	else
 		enum attributeName = SnakeCase!(__traits(identifier, R));
+}
+
+unittest
+{
+	writeln("\t * attributeName");
+	struct Test
+	{
+		string id;
+		string someName;
+		@attr("someRandomName") string a;
+	}
+
+	static assert(attributeName!(Test.id) == "id");
+	static assert(attributeName!(Test.someName) == "some_name");
+	static assert(attributeName!(Test.a) == "someRandomName");
 }
 
 
@@ -156,13 +203,42 @@ template getMembersByUDA(T, alias attribute)
 	alias getMembersByUDA = Filter!(hasSpecificUDA, __traits(allMembers, T));
 }
 
+unittest
+{
+	writeln("\t * getMembersByUDA");
+
+	struct Test
+	{
+		@PK int id;
+		@FK!Test int id2;
+		@FK!Test int id3;
+	}
+
+	static assert(getMembersByUDA!(Test, PrimaryKeyAttribute)[0] == "id");
+	static assert(getMembersByUDA!(Test, ForeignKeyAttribute)[0] == "id2");
+	static assert(getMembersByUDA!(Test, ForeignKeyAttribute)[1] == "id3");
+}
+
 template primaryKeyName(T)
 {
 	alias fields = getMembersByUDA!(T, PrimaryKeyAttribute);
-	static assert(fields.length < 2, "Multiple or composite primary key found for " ~ T.stringof ~ ", this is not currently supported");
+	static assert(fields.length < 2,
+			"Multiple or composite primary key found for " ~ T.stringof ~ ", this is not currently supported");
 	static assert(fields.length == 1, "No primary key found for " ~ T.stringof);
 
-	enum primaryKeyName = fields[0].stringof;
+	enum primaryKeyName = mixin(fields[0].stringof);
+}
+
+unittest
+{
+	writeln("\t * primaryKeyName");
+	struct Test
+	{
+		@PK int myPK;
+		int id;
+	}
+
+	static assert(primaryKeyName!Test == "myPK");
 }
 
 template isPK(alias T, string m)
@@ -170,11 +246,23 @@ template isPK(alias T, string m)
 	enum isPK = hasUDA!(mixin("T." ~ m), PrimaryKeyAttribute);
 }
 
-string embeddedPrefix(T)()
+unittest
 {
-	return "_" ~ relationName!T ~ "_";
+	writeln("\t * isPK");
+	struct Test
+	{
+		@PK int id;
+		string a;
+	}
+	
+	static assert(isPK!(Test, "id"));
+	static assert(!isPK!(Test, "a"));
 }
 
+template embeddedPrefix(T)
+{
+	enum embeddedPrefix =  "_" ~ relationName!T ~ "_";
+}
 
 template AttributeList2(
 		T,
@@ -223,7 +311,34 @@ template AttributeList2(
 							fields[1 .. $]);
 		}
 	}
+}
 
+unittest
+{
+	writeln("\t * AttributeList");
+	struct Test2
+	{
+		string bar;
+		string baz;
+	}
+
+	struct Test
+	{
+		@PK int id;
+		Test2 inner;
+	}
+
+	static assert(AttributeList!Test[0] == Column("id", "id"));
+	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_bar"));
+	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_baz"));
+
+	// ignorePK
+	static assert(AttributeList!(Test, true)[0] == Column("(\"inner\").bar", "_test2_bar"));
+	static assert(AttributeList!(Test, true)[1] == Column("(\"inner\").baz", "_test2_baz"));
+
+ // INSERT syntax, with ignorePK
+	static assert(AttributeList!(Test, true, true)[0] == Column("\"inner\".bar", "_test2_bar"));
+	static assert(AttributeList!(Test, true, true)[1] == Column("\"inner\".baz", "_test2_baz"));
 }
 
 template AttributeList(T, bool ignorePK = false, bool insert = false)
@@ -270,6 +385,23 @@ alias sqlMembers = attributeList;
 template serialisableMembers(T)
 {
 	alias serialisableMembers = filterSerialisableMembers!(T, __traits(allMembers, T));
+}
+
+unittest
+{
+	writeln("\t * serialisableMembers");
+	struct Test
+	{
+		int a;
+		private int _b;
+		@property int b() {return _b;};
+		@property void b(int x) {_b = x;};
+		@property int c() {return _b;};
+	}
+
+	static assert(serialisableMembers!Test.length == 2);
+	static assert(serialisableMembers!Test[0] == "a");
+	static assert(serialisableMembers!Test[1] == "b");
 }
 
 template filterSerialisableMembers(T, FIELDS...)
