@@ -5,6 +5,12 @@ import dpq.value;
 import dpq.exception;
 import dpq.result;
 
+version(unittest)
+{
+	import std.stdio;
+	private Connection c;
+}
+
 struct Query
 {
 	private string _command;
@@ -28,6 +34,33 @@ struct Query
 		_params = params;
 	}
 
+
+	unittest
+	{
+		writeln(" * Query");
+
+		c = Connection("dbname=test user=test");
+
+		writeln("\t * this()");
+		Query q;
+		assert(q._connection == null);
+
+		writeln("\t * this(command, params[])");
+		string cmd = "some command";
+		q = Query(cmd);
+		assert(q._connection != null, `not null 2`);
+		assert(q._command == cmd, `cmd`);
+		assert(q._params == [], `empty arr`);
+
+		Connection c2 = Connection("dbname=test user=test");
+		writeln("\t * this(Connection, command, params[])");
+		q = Query(c2);
+		assert(q._connection == &c2);
+
+		q = Query(cmd);
+		assert(q._connection == &c2);
+	}
+
 	@property void connection(ref Connection conn)
 	{
 		_connection = &conn;
@@ -46,6 +79,17 @@ struct Query
 	void addParam(T)(T val)
 	{
 		_params ~= Value(val);
+	}
+
+	unittest
+	{
+		Query q;
+		assert(q._params.length == 0);
+
+		q.addParam(1);
+
+		assert(q._params.length == 1);
+		assert(q._params[0] == Value(1));
 	}
 
 	ref Query opBinary(string op, T)(T val)
@@ -82,6 +126,44 @@ struct Query
 		return run();
 	}
 
+	unittest
+	{
+		writeln("\t * run");
+
+		auto c = Connection("dbname=test user=test");
+		
+		auto q = Query("SELECT 1::INT");
+
+		auto r = q.run();
+		assert(r.rows == 1);
+		assert(r.columns == 1);
+		assert(r[0][0].as!int == 1);
+
+		writeln("\t\t * async");
+		q.runAsync();
+
+		r = c.lastResult();
+		assert(r.rows == 1);
+		assert(r.columns == 1);
+		assert(r[0][0].as!int == 1);
+
+		writeln("\t * run(params...)");
+
+		q = "SELECT $1";
+		q.run(1);
+		assert(r.rows == 1);
+		assert(r.columns == 1);
+		assert(r[0][0].as!int == 1);
+
+		writeln("\t\t * async");
+
+		q.runAsync(1);
+		r = c.lastResult();
+		assert(r.rows == 1);
+		assert(r.columns == 1);
+		assert(r[0][0].as!int == 1);
+	}
+
 	bool runAsync(T...)(T params)
 	{
 		foreach (p; params)
@@ -92,12 +174,7 @@ struct Query
 
 	bool runAsync()
 	{
-		if (_params.length > 0)
-		{
-			_connection.sendParams(_command, _params);
-			return true; // FIXME: must return actual sendQueryParams status
-		}
-
-		return _connection.send(_command);
+		_connection.sendParams(_command, _params);
+		return true; // FIXME: must return the actual result from PQsendQueryParams
 	}
 }
