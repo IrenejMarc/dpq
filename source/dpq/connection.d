@@ -9,6 +9,7 @@ import dpq.attributes;
 import dpq.querybuilder;
 import dpq.meta;
 import dpq.prepared;
+import dpq.smartptr;
 
 import std.string;
 import derelict.pq.pq;
@@ -28,13 +29,15 @@ version(unittest)
 
 	Examples:
 	-------------
-	auto conn = Connection("host=localhost dbname=testdb user=testuer");
+	auto conn = Connection("host=localhost dbname=testdb user=testuser");
 	//conn.exec ...
 	-------------
 */
 struct Connection
 {
-	private PGconn* _connection;
+	alias ConnectionPtr = SmartPointer!(PGconn*, PQfinish);
+
+	private ConnectionPtr _connection;
 	private PreparedStatement[string] _prepared;
 
 	/**
@@ -54,7 +57,7 @@ struct Connection
 		if (err != null)
 			throw new DPQException(err.fromStringz.to!string);
 
-		_connection = PQconnectdb(connString.toStringz);
+		_connection = new ConnectionPtr(PQconnectdb(connString.toStringz));
 
 		if (status != ConnStatusType.CONNECTION_OK)
 			throw new DPQException(errorMessage);
@@ -69,22 +72,12 @@ struct Connection
 		assert(c.status == ConnStatusType.CONNECTION_OK);
 	}
 
-	/** Copy constructor is disabled to avoid double-freeing the PGConn pointer */
-	@disable this(this);
-
-	/** The destructor will automatically close the connection and free resources */
-	~this()
-	{
-		PQfinish(_connection);
-	}
-
 	/** 
 		Close the connection manually 
 	*/
 	void close()
 	{
-		PQfinish(_connection);
-		_connection = null;
+		_connection.clear();
 	}
 
 	@property const(ConnStatusType) status()
