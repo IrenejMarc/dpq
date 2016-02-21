@@ -173,7 +173,7 @@ struct PGArray
 
 	unittest
 	{
-		writeln("\t* this(T val)");
+		writeln("\t * this(T val)");
 
 		int[] x = [1,2,3];
 		auto a = PGArray(x);
@@ -223,6 +223,33 @@ struct PGArray
 		return res;
 	}
 
+	unittest
+	{
+		writeln("\t * toBytes");
+
+		int[] ints = [1, 2, 3];
+		auto pga = PGArray(ints);
+
+		ubyte[] arr = [
+				0, 0, 0, 1,  // nDims - 1
+				0, 0, 0, 0,  // flags, ignored, always 0
+				0, 0, 0, 23, // elementOid
+
+				0, 0, 0, 3,  // dimension size
+				0, 0, 0, 1,  // lower bound
+
+				0, 0, 0, 4,  // elem length
+				0, 0, 0, 1,  // elem value
+
+				0, 0, 0, 4,  // elem length
+				0, 0, 0, 2,  // elem value
+
+				0, 0, 0, 4,  // elem length
+				0, 0, 0, 3]; // elem value
+
+		assert(pga.toBytes == arr);
+	}
+
 	T opCast(T)()
 			if (isArray!T)
 	{
@@ -260,6 +287,19 @@ struct PGArray
 		}
 
 		return assemble!T();
+	}
+
+	unittest
+	{
+		writeln("\t * cast");
+	
+		int[] ints = [1, 2, 3, 4, 5];
+		long[] longs = [5, 6, 7, 123];
+		bool[] bools = [true, true, false, true, false, true];
+
+		assert(cast(int[]) PGArray(ints) == ints, "ints");
+		assert(cast(long[]) PGArray(longs) == longs, "longs");
+		assert(cast(bool[]) PGArray(bools) == bools, "bools");
 	}
 }
 
