@@ -10,6 +10,8 @@ import dpq.meta;
 import dpq.exception;
 import dpq.value;
 
+version(unittest) import std.stdio;
+
 /* reverse-enigneering the source
 
 	Name         | size in B       | notes
@@ -93,12 +95,41 @@ struct PGArray
 			
 			if (elementSize == 0)
 				elementSize = elemSize;
+			else if (elemSize == -1)
+				continue; // null value, ignore
 			else if (elementSize != elemSize)
 				assert("All elements of an array must be the same type/length");
 
 			foreach (i; 0 .. elemSize)
 				value ~= read!ubyte(bytes);
 		}
+	}
+
+	unittest
+	{
+		writeln("* PGArray");
+		writeln("\t * this(ubyte[])");
+
+		int[] ints = [1, 2, 3];
+		ubyte[] arr = [
+				0, 0, 0, 1,  // nDims - 1
+				0, 0, 0, 0,  // flags, ignored, always 0
+				0, 0, 0, 23, // elementOid
+
+				0, 0, 0, 3,  // dimension size
+				0, 0, 0, 1,  // lower bound
+
+				0, 0, 0, 4,  // elem length
+				0, 0, 0, 1,  // elem value
+
+				0, 0, 0, 4,  // elem length
+				0, 0, 0, 2,  // elem value
+
+				0, 0, 0, 4,  // elem length
+				0, 0, 0, 3]; // elem value
+
+		auto v = PGArray(arr);
+		assert(v == PGArray(ints));
 	}
 
 	this(T)(T val)
@@ -138,6 +169,23 @@ struct PGArray
 		}
 
 		arr(val);
+	}
+
+	unittest
+	{
+		writeln("\t* this(T val)");
+
+		int[] x = [1,2,3];
+		auto a = PGArray(x);
+
+		assert(a.value == [
+				0, 0, 0, 1,
+				0, 0, 0, 2,
+				0, 0, 0, 3],
+			a.value.to!string);
+		assert(a.nDimensions == 1);
+		assert(a.elementOid == Type.INT4);
+		assert(a.dimSizes == [3]);
 	}
 
 	ubyte[] toBytes()
