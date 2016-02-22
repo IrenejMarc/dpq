@@ -126,6 +126,20 @@ struct Query
 		return run();
 	}
 
+	bool runAsync(T...)(T params)
+	{
+		foreach (p; params)
+			addParam(p);
+
+		return runAsync();
+	}
+
+	bool runAsync()
+	{
+		_connection.sendParams(_command, _params);
+		return true; // FIXME: must return the actual result from PQsendQueryParams
+	}
+
 	unittest
 	{
 		writeln("\t * run");
@@ -162,19 +176,5 @@ struct Query
 		assert(r.rows == 1);
 		assert(r.columns == 1);
 		assert(r[0][0].as!int == 1);
-	}
-
-	bool runAsync(T...)(T params)
-	{
-		foreach (p; params)
-			addParam(p);
-
-		return runAsync();
-	}
-
-	bool runAsync()
-	{
-		_connection.sendParams(_command, _params);
-		return true; // FIXME: must return the actual result from PQsendQueryParams
 	}
 }
