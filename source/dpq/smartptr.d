@@ -2,11 +2,25 @@ module dpq.smartptr;
 
 import dpq.exception;
 
-class SmartPointer(T, alias _free = null)
+version(unittest)
+{
+	int nFrees = 0;
+	void fakeFree(T)(T* val)
+	{
+		++nFrees;
+	}
+}
+
+class SmartPointer(T, alias _free)
 {
 	private T _ptr;
 
 	alias get this;
+
+	this()
+	{
+		_ptr = null;
+	}
 
 	this(T ptr)
 	{
@@ -37,6 +51,9 @@ class SmartPointer(T, alias _free = null)
 
 	void opAssign(T ptr)
 	{
+		if (ptr == _ptr)
+			return;
+
 		clear();
 		_ptr = ptr;
 	}
@@ -46,11 +63,47 @@ class SmartPointer(T, alias _free = null)
 		if (_ptr == null)
 			return;
 
-		if (_free == null)
-			delete _ptr;
-		else
-			_free(_ptr);
+		_free(_ptr);
 
 		_ptr = null;
 	}
 }
+
+unittest
+{
+	import std.stdio;
+
+	writeln(" * SmartPointer");
+
+	alias Ptr = SmartPointer!(ubyte*, fakeFree);
+
+	ubyte* p = new ubyte;
+	*p = 2;
+	auto sp = new Ptr;
+
+	assert(sp._ptr == null);
+
+	sp = p;
+	assert(sp._ptr == p);
+
+	// assign the same ptr
+	sp = p;
+	assert(nFrees == 0);
+	assert(!sp.isNull);
+	assert(sp._ptr == p);
+
+	ubyte* p2 = new ubyte;
+	*p2 = 255;
+
+	sp = p2;
+	assert(nFrees == 1);
+	assert(sp._ptr == p2);
+
+	sp = new Ptr(p2);
+	assert(sp._ptr == p2);
+
+	sp.clear();
+	assert(sp.isNull);
+	assert(sp._ptr == null);
+}
+
