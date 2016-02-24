@@ -92,34 +92,36 @@ template SQLType(T)
 {
 	alias BT = BaseType!T;
 
-	static if (isSomeString!BT)
-		enum type = "TEXT";
-	else static if(is(T == ubyte[]) || is(T == byte[]))
-		enum type = "BYTEA";
-
-	else static if (is(BT == int))
-		enum type = "INT4";
-	else static if (is(BT == long))
-		enum type = "INT8";
-	else static if (is(BT == short))
-		enum type = "INT2";
-	else static if (is(BT == float))
-		enum type = "FLOAT4";
-	else static if (is(BT == double))
-		enum type = "FLOAT8";
-	else static if (is(BT == bool))
-		enum type = "BOOL";
-	else static if (is(BT == char))
-		enum type = "CHAR(1)";
-	else static if (is(BT == enum))
-		enum type = SQLType!(OriginalType!BT);
+	static if(is(T == ubyte[]) || is(T == byte[]))
+		enum SQLType = "BYTEA";
 	else
-		static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" to any PG type, please specify it manually using @type.");
+	{
+		static if (isSomeString!BT)
+			enum type = "TEXT";
+		else static if (is(BT == int))
+			enum type = "INT4";
+		else static if (is(BT == long))
+			enum type = "INT8";
+		else static if (is(BT == short))
+			enum type = "INT2";
+		else static if (is(BT == float))
+			enum type = "FLOAT4";
+		else static if (is(BT == double))
+			enum type = "FLOAT8";
+		else static if (is(BT == bool))
+			enum type = "BOOL";
+		else static if (is(BT == char))
+			enum type = "CHAR(1)";
+		else static if (is(BT == enum))
+			enum type = SQLType!(OriginalType!BT);
+		else
+			static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" to any PG type, please specify it manually using @type.");
 
-	static if (isArray!T && !isSomeString!T)
-		enum SQLType = type ~ "[]";
-	else 
-		enum SQLType = type;
+		static if (isArray!T && !isSomeString!T)
+			enum SQLType = type ~ "[]";
+		else 
+			enum SQLType = type;
+	}
 }
 
 unittest
@@ -134,6 +136,7 @@ unittest
 	static assert(SQLType!(double[]) == "FLOAT8[]");
 	static assert(SQLType!(string) == "TEXT");
 	static assert(SQLType!(string[]) == "TEXT[]");
+	static assert(SQLType!(ubyte[]) == "BYTEA");
 }
 
 /**
