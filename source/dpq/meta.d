@@ -94,6 +94,9 @@ template SQLType(T)
 
 	static if (isSomeString!BT)
 		enum type = "TEXT";
+	else static if(is(T == ubyte[]) || is(T == byte[]))
+		enum type = "BYTEA";
+
 	else static if (is(BT == int))
 		enum type = "INT4";
 	else static if (is(BT == long))
@@ -108,8 +111,6 @@ template SQLType(T)
 		enum type = "BOOL";
 	else static if (is(BT == char))
 		enum type = "CHAR(1)";
-	else static if(is(BT == ubyte[]) || is(BT == byte[]))
-		enum type = "BYTEA";
 	else static if (is(BT == enum))
 		enum type = SQLType!(OriginalType!BT);
 	else
