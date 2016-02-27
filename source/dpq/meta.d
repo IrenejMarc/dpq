@@ -1,6 +1,9 @@
 module dpq.meta;
 
+import dpq.attributes;
+
 import std.traits;
+import std.datetime : SysTime;
 
 version(unittest) import std.stdio;
 
@@ -98,6 +101,8 @@ template SQLType(T)
 	{
 		static if (isSomeString!BT)
 			enum type = "TEXT";
+		else static if (is(BT == SysTime))
+			enum type = "timestamp";
 		else static if (is(BT == int))
 			enum type = "INT4";
 		else static if (is(BT == long))
@@ -115,7 +120,10 @@ template SQLType(T)
 		else static if (is(BT == enum))
 			enum type = SQLType!(OriginalType!BT);
 		else
-			static assert(false, "Cannot map type \"" ~ T.stringof ~ "\" to any PG type, please specify it manually using @type.");
+			static assert(false,
+					"Cannot map type \"" ~ T.stringof ~ "\" to any PG type, " ~
+					"please note that embedded structures need an @embed " ~
+					"or @type attribute if you do not wish to embed them.");
 
 		static if (isArray!T && !isSomeString!T)
 			enum SQLType = type ~ "[]";
@@ -166,3 +174,15 @@ unittest
 	static assert(ArrayDimensions!(int[][][]) == 3);
 }
 
+
+template ShouldRecurse(alias TA)
+{
+	alias T = typeof(TA);
+	static if (is(T == class) || is(T == struct))
+		static if (hasUDA!(TA, EmbedAttribute))
+			enum ShouldRecurse = true;
+		else
+			enum ShouldRecurse = false;
+	else
+		enum ShouldRecurse = false;
+}

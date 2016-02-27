@@ -340,14 +340,15 @@ package struct Row
 	}
 }
 
-Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
+package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 {	
+	import std.datetime;
 	import std.bitmanip;
 	import std.conv : to;
 
 	alias TU = Unqual!T;
 
-	static if (is(TU == string))
+	static if (isSomeString!TU)
 	{
 		string str = cast(string)bytes[0 .. len];
 		return Nullable!string(str);
@@ -358,6 +359,11 @@ Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 	{
 		auto arr = PGArray(bytes);
 		return Nullable!T(cast(T)arr);
+	}
+	else static if (is(TU == SysTime))
+	{
+		SysTime t = SysTime(fromBytes!long(bytes) * 10 + SysTime(POSTGRES_EPOCH).stdTime);
+		return Nullable!SysTime(t);
 	}
 	else
 		return Nullable!T(bigEndianToNative!(T, T.sizeof)(bytes.to!(ubyte[T.sizeof])));

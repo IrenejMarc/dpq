@@ -367,7 +367,7 @@ struct Connection
 				else
 				{
 					alias tu = Unqual!t;
-					static if (is(tu == class) || is(tu == struct))
+					static if (ShouldRecurse!(mixin("type." ~ m)))
 					{
 						ensureSchema!tu(true);
 						cols ~= '"' ~ relationName!tu ~ '"';
@@ -457,7 +457,7 @@ struct Connection
 			@serial8 @PK long id;
 			string str;
 			int n;
-			Inner inner;
+			@embed Inner inner;
 		}
 
 		c.ensureSchema!TestTable1;
@@ -868,7 +868,7 @@ struct Connection
 			{
 				static if (isPK!(T, m))
 					continue;
-				else static if (is(typeof(mixin("T." ~ m)) == class) || is(typeof(mixin("T." ~ m)) == struct))
+				else static if (ShouldRecurse!(mixin("T." ~ m)))
 					addVals!(typeof(mixin("T." ~ m)))(__traits(getMember, val, m));
 				else
 					qb.addValue(__traits(getMember, val, m));
@@ -900,7 +900,7 @@ struct Connection
 		struct Test
 		{
 			int n;
-			Inner foo;
+			@embed Inner foo;
 		}
 		c.ensureSchema!Test;
 
@@ -1218,7 +1218,7 @@ T deserialise(T)(Row r, string prefix = "")
 		enum n = attributeName!(mixin("T." ~ m));
 		alias mType = typeof(mixin("T." ~ m));
 
-		static if (is(mType == class) || is(mType == struct))
+		static if (ShouldRecurse!(__traits(getMember, res, m)))
 			__traits(getMember, res, m) = deserialise!mType(r, embeddedPrefix!mType ~ prefix);
 		else
 		{

@@ -13,8 +13,11 @@ import std.conv : to;
 import std.typecons : Nullable;
 import std.bitmanip;
 import std.traits;
+import std.datetime : SysTime, DateTime;
 
 version(unittest) import std.stdio;
+
+enum POSTGRES_EPOCH = DateTime(2000, 1, 1);
 
 package enum Type : Oid
 {
@@ -175,6 +178,17 @@ struct Value
 		_size = _valueBytes.length.to!int;
 		_type = Type.TEXT;
 	}
+
+	void opAssign(SysTime val)
+	{
+		import core.time;
+
+		_type = typeOid!SysTime;
+		// stdTime is in hnsecs, psql wants microsecs
+		long diff = val.stdTime - SysTime(POSTGRES_EPOCH).stdTime;
+		_valueBytes = nativeToBigEndian(diff / 10).dup;
+		_size = typeof(val.stdTime).sizeof;
+	}
 	
 	void opAssign(Value val)
 	{
@@ -214,6 +228,13 @@ struct Value
 		Value v2;
 		v.opAssign(v2);
 		assert(v2 == v);
+
+
+		import std.datetime;
+		SysTime t = Clock.currTime;
+		v2 = t;
+
+		assert(v2.as!SysTime == t);
 	}
 
 	@property int size()
@@ -292,6 +313,8 @@ template typeOid(T)
 				enum typeOid = Type.FLOAT4;
 			else static if (is(TU == double))
 				enum typeOid = Type.FLOAT8;
+			else static if (is(TU == SysTime))
+				enum typeOid = Type.TIMESTAMP;
 
 			/**
 				Since unsigned types are not supported by PostgreSQL, we use signed

@@ -5,6 +5,7 @@ import std.typetuple;
 import std.typecons;
 
 import dpq.column;
+import dpq.meta;
 
 version(unittest)
 {
@@ -20,6 +21,9 @@ struct RelationAttribute
 {
 	string name;
 }
+
+enum EmbedAttribute;
+alias embed = EmbedAttribute;
 
 AttributeAttribute attribute(string name)
 {
@@ -151,7 +155,13 @@ unittest
 template relationName(alias R)
 {
 	static if (hasUDA!(R, RelationAttribute))
-		enum relationName = getUDAs!(R, RelationAttribute)[0].name;
+	{
+		enum rName = getUDAs!(R, RelationAttribute)[0].name;
+		static if (rName.length == 0)
+			enum relationName = SnakeCase!(R.stringof);
+		else
+			enum relationName = rName;
+	}
 	else
 		enum relationName = SnakeCase!(R.stringof);
 }
@@ -280,7 +290,7 @@ template AttributeList2(
 
 		static if (ignorePK && isPK!(T, fields[0]))
 			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
-		else static if (is(mt == struct) || is(mt == class))
+		else static if (ShouldRecurse!(mixin("T." ~ fields[0])))
 		{
 			static if (insert)
 				enum pref = "\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\".";
@@ -325,9 +335,10 @@ unittest
 	struct Test
 	{
 		@PK int id;
-		Test2 inner;
+		@embed Test2 inner;
 	}
 
+	pragma(msg, ShouldRecurse!(Test.inner));
 	static assert(AttributeList!Test[0] == Column("id", "id"));
 	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_bar"));
 	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_baz"));
@@ -508,8 +519,10 @@ template isPublicMember(T, string M)
 {
 	import std.algorithm, std.typetuple : TypeTuple;
 
-	static if (!__traits(compiles, TypeTuple!(__traits(getMember, T, M)))) enum isPublicMember = false;
-	else {
+	static if (!__traits(compiles, TypeTuple!(__traits(getMember, T, M)))) 
+		enum isPublicMember = false;
+	else 
+	{
 		alias MEM = TypeTuple!(__traits(getMember, T, M));
 		enum isPublicMember = __traits(getProtection, MEM).among("public", "export");
 	}
