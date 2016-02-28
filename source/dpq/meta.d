@@ -3,6 +3,7 @@ module dpq.meta;
 import dpq.attributes;
 
 import std.traits;
+import std.typecons : Nullable;
 import std.datetime : SysTime;
 
 version(unittest) import std.stdio;
@@ -95,40 +96,49 @@ template SQLType(T)
 {
 	alias BT = BaseType!T;
 
-	static if(is(T == ubyte[]) || is(T == byte[]))
-		enum SQLType = "BYTEA";
+	static if(isInstanceOf!(Nullable, T))
+	{
+		enum SQLType = SQLType!(Unqual!(typeof(T.get)));
+		//enum isNullable = true;
+	}
 	else
 	{
-		static if (isSomeString!BT)
-			enum type = "TEXT";
-		else static if (is(BT == SysTime))
-			enum type = "timestamp";
-		else static if (is(BT == int))
-			enum type = "INT4";
-		else static if (is(BT == long))
-			enum type = "INT8";
-		else static if (is(BT == short))
-			enum type = "INT2";
-		else static if (is(BT == float))
-			enum type = "FLOAT4";
-		else static if (is(BT == double))
-			enum type = "FLOAT8";
-		else static if (is(BT == bool))
-			enum type = "BOOL";
-		else static if (is(BT == char))
-			enum type = "CHAR(1)";
-		else static if (is(BT == enum))
-			enum type = SQLType!(OriginalType!BT);
+		enum isNullable = false;
+		static if(is(T == ubyte[]) || is(T == byte[]))
+			enum SQLType = "BYTEA";
 		else
-			static assert(false,
-					"Cannot map type \"" ~ T.stringof ~ "\" to any PG type, " ~
-					"please note that embedded structures need an @embed " ~
-					"or @type attribute if you do not wish to embed them.");
+		{
+			static if (isSomeString!BT)
+				enum type = "TEXT";
+			else static if (is(BT == SysTime))
+				enum type = "timestamp";
+			else static if (is(BT == int))
+				enum type = "INT4";
+			else static if (is(BT == long))
+				enum type = "INT8";
+			else static if (is(BT == short))
+				enum type = "INT2";
+			else static if (is(BT == float))
+				enum type = "FLOAT4";
+			else static if (is(BT == double))
+				enum type = "FLOAT8";
+			else static if (is(BT == bool))
+				enum type = "BOOL";
+			else static if (is(BT == char))
+				enum type = "CHAR(1)";
+			else static if (is(BT == enum))
+				enum type = SQLType!(OriginalType!BT);
+			else
+				static assert(false,
+						"Cannot map type \"" ~ T.stringof ~ "\" to any PG type, " ~
+						"please note that embedded structures need an @embed " ~
+						"or @type attribute if you do not wish to embed them.");
 
-		static if (isArray!T && !isSomeString!T)
-			enum SQLType = type ~ "[]";
-		else 
-			enum SQLType = type;
+			static if (isArray!T && !isSomeString!T)
+				enum SQLType = type ~ "[]";
+			else 
+				enum SQLType = type;
+		}
 	}
 }
 
@@ -145,6 +155,8 @@ unittest
 	static assert(SQLType!(string) == "TEXT");
 	static assert(SQLType!(string[]) == "TEXT[]");
 	static assert(SQLType!(ubyte[]) == "BYTEA");
+
+	static assert(SQLType!(Nullable!int) == "INT4");
 }
 
 /**
