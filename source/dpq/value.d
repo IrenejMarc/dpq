@@ -159,13 +159,32 @@ struct Value
 	}
 
 	void opAssign(T)(T val)
-			if(!isArray!T)
+			if(!isArray!T && !isInstanceOf!(Nullable, T))
 	{
 		_size = val.sizeof;
 
 		//_valueBytes = new ubyte[_size];
 		//write(_valueBytes, val, 0);
 		_valueBytes = nativeToBigEndian(val).dup;
+
+		_type = typeOid!T;
+	}
+
+	void opAssign(T)(T val)
+		if (isInstanceOf!(Nullable, T))
+	{
+		if (val.isNull)
+		{
+			// NULL values are represented as a single byte with the value of -1
+			_size = 1;
+			_valueBytes = [cast(byte) -1];
+			_isNull = true;
+		}
+		else
+		{
+			_size = typeof(val.get).sizeof;
+			_valueBytes = nativeToBigEndian(val.get).dup;
+		}
 
 		_type = typeOid!T;
 	}
@@ -229,12 +248,16 @@ struct Value
 		v.opAssign(v2);
 		assert(v2 == v);
 
-
 		import std.datetime;
 		SysTime t = Clock.currTime;
 		v2 = t;
 
 		assert(v2.as!SysTime == t);
+
+		Nullable!int ni;
+		assert(Value(ni).as!int.isNull);
+		ni = 5;
+		assert(Value(ni).as!int == ni);
 	}
 
 	@property int size()
