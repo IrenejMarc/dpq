@@ -43,6 +43,8 @@ struct QueryBuilder
 		Value[string] _params;
 		Value[] _indexParams;
 
+		string[] _returning;
+
 		// UPDATE's SET
 		string[] _set;
 
@@ -397,6 +399,14 @@ struct QueryBuilder
 		return remove(relationName!T);
 	}
 
+	ref QueryBuilder returning(string[] ret...)
+	{
+		foreach (r; ret)
+			_returning ~= r;
+
+		return this;
+	}
+
 	unittest
 	{
 		writeln("\t * remove");
@@ -497,6 +507,12 @@ struct QueryBuilder
 				_indexParams.map!(v => "$%d".format(++index)).join(", ")
 				);
 
+		if (_returning.length > 0)
+		{
+			str ~= " RETURNING ";
+			str ~= _returning.join(", ");
+		}
+
 		return str;
 	}
 
@@ -506,10 +522,11 @@ struct QueryBuilder
 
 		QueryBuilder qb;
 		qb.insert("table", "col")
-			.values(1);
+			.values(1)
+			.returning("id");
 
 		string str = qb.command();
-		assert(str == `INSERT INTO "table" (col) VALUES ($1)`);
+		assert(str == `INSERT INTO "table" (col) VALUES ($1) RETURNING id`);
 	}
 
 	private string updateCommand()
@@ -521,6 +538,12 @@ struct QueryBuilder
 		if (_filter.length > 0)
 			str ~= " WHERE " ~ _filter;
 
+		if (_returning.length > 0)
+		{
+			str ~= " RETURNING ";
+			str ~= _returning.join(", ");
+		}
+
 		return replaceParams(str);
 	}
 
@@ -531,12 +554,13 @@ struct QueryBuilder
 		QueryBuilder qb;
 		qb.update("table")
 			.set("col", 1)
-			.where("foo", 2);
+			.where("foo", 2)
+			.returning("id");
 
 		string str = qb.command();
 		assert(
-				str == `UPDATE "table" SET "col" = $1 WHERE foo = $2` ||
-				str == `UPDATE "table" SET "col" = $2 WHERE foo = $1`);
+				str == `UPDATE "table" SET "col" = $1 WHERE foo = $2 RETURNING id` ||
+				str == `UPDATE "table" SET "col" = $2 WHERE foo = $1 RETURNING id`);
 	}
 
 	private string deleteCommand()
@@ -545,6 +569,12 @@ struct QueryBuilder
 
 		if (_filter.length > 0)
 			str ~= " WHERE " ~ _filter;
+
+		if (_returning.length > 0)
+		{
+			str ~= " RETURNING ";
+			str ~= _returning.join(", ");
+		}
 
 		return replaceParams(str);
 	}
@@ -555,10 +585,11 @@ struct QueryBuilder
 
 		QueryBuilder qb;
 		qb.remove("table")
-			.where("id", 1);
+			.where("id", 1)
+			.returning("id");
 
 		string str = qb.command();
-		assert(str == `DELETE FROM "table" WHERE id = $1`);
+		assert(str == `DELETE FROM "table" WHERE id = $1 RETURNING id`, str);
 	}
 
 	@property string command()
