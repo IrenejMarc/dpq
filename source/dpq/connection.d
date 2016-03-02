@@ -857,30 +857,41 @@ struct Connection
 		update!T(id, updates, true);
 	}
 
+
+	private void addVals(T, U)(ref QueryBuilder qb, U val)
+	{
+		foreach (m; serialisableMembers!T)
+		{
+			static if (isPK!(T, m))
+				continue;
+			else static if (ShouldRecurse!(mixin("T." ~ m)))
+				addVals!(typeof(mixin("T." ~ m)))(qb, __traits(getMember, val, m));
+			else
+				qb.addValue(__traits(getMember, val, m));
+		}
+	}
+
+	Result insertR(T)(T val, string ret = "")
+	{
+		QueryBuilder qb;
+		qb.insert(relationName!T, AttributeList!(T, true, true));
+		if (ret.length > 0)
+			qb.returning(ret);
+
+		addVals!T(qb, val);
+
+		return qb.query(this).run();
+	}
+
 	bool insert(T)(T val, bool async = false)
 	{
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
 
-		void addVals(T, U)(U val)
-		{
-			foreach (m; serialisableMembers!T)
-			{
-				static if (isPK!(T, m))
-					continue;
-				else static if (ShouldRecurse!(mixin("T." ~ m)))
-					addVals!(typeof(mixin("T." ~ m)))(__traits(getMember, val, m));
-				else
-					qb.addValue(__traits(getMember, val, m));
-			}
-		}
-
-		addVals!T(val);
+		addVals!T(qb, val);
 
 		if (async)
-		{
 			return qb.query(this).runAsync();
-		}
 
 		auto r = qb.query(this).run();
 		return r.rows > 0;
@@ -910,6 +921,10 @@ struct Connection
 		
 		auto r = c.insert(t);
 		assert(r == true);
+
+		auto r2 = c.insertR(t, "n");
+		assert(r2.rows == 1);
+		assert(r2[0][0].as!int == t.n);
 
 		Test t2 = c.findOneBy!Test("n", 1);
 		assert(t2 == t);
