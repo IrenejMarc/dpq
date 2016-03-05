@@ -1023,6 +1023,43 @@ struct Connection
 		c.exec("DROP TABLE remove_test");
 	}
 
+	long count(T, U...)(string filter = "", U vals = U.init)
+	{
+		import dpq.query;
+		auto q = Query(this);
+		string str = `SELECT COUNT(*) FROM "%s"`.format(relationName!T);
+
+		if (filter.length > 0)
+			str ~= " WHERE " ~ filter;
+
+		q = str;
+		auto r = q.run(vals);
+
+		return r[0][0].as!long;
+	}
+
+	unittest
+	{
+		writeln("\t * count");
+
+		@relation("test_count")
+		struct Test
+		{
+			@serial @PK int id;
+			int n;
+		}
+
+		c.ensureSchema!Test;
+
+		Test t;
+		c.insert(t);
+
+		assert(c.count!Test == 1, `count == 1`);
+		c.insert(t);
+		assert(c.count!Test == 2, `count == 2`);
+
+		c.exec("DROP TABLE test_count");
+	}
 
 	bool isBusy()
 	{
