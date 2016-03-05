@@ -355,6 +355,7 @@ unittest
 template AttributeList(T, bool ignorePK = false, bool insert = false)
 {
 	alias AttributeList = AttributeList2!(T, "", "", ignorePK, insert, serialisableMembers!(T));
+	static assert(AttributeList.length > 0, "AttributeList found no fields, cannot continue");
 }
 
 deprecated("Use compile-time AttributeList!T instead")
