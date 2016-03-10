@@ -67,7 +67,7 @@ struct Connection
 
 	unittest
 	{
-		c = Connection("dbname=test user=test");
+		c = Connection("host=anubis.ad.nuclei.co dbname=testdb user=testuser");
 		writeln(" * Database connection with connection string");
 		assert(c.status == ConnStatusType.CONNECTION_OK);
 	}
@@ -911,12 +911,14 @@ struct Connection
 		struct Test
 		{
 			int n;
+			Nullable!int n2;
 			@embed Inner foo;
 		}
 		c.ensureSchema!Test;
 
 		Test t;
 		t.n = 1;
+		t.n2 = 2;
 		t.foo.bar = 2;
 		
 		auto r = c.insert(t);
@@ -931,10 +933,13 @@ struct Connection
 
 		writeln("\t\t * async");
 		t.n = 123;
+		t.n2.nullify;
 		c.insertAsync(t);
 		
 		auto res = c.nextResult();
 		assert(res.rows == 1);
+		t2 = c.findOneBy!Test("n", 1);
+		assert(t2 == t);
 
 		c.exec("DROP TABLE insert_test");
 		c.exec("DROP TYPE \"%s\" CASCADE".format(relationName!Inner));

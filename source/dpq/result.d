@@ -340,7 +340,14 @@ package struct Row
 	}
 }
 
+
+package T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
+	if (isInstanceOf!(Nullable, T))
+{
+	return fromBytes!(Unqual!(typeof(T.get)))(bytes, len);
+}
 package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
+	if (!isInstanceOf!(Nullable, T))
 {	
 	import std.datetime;
 	import std.bitmanip;
@@ -348,25 +355,36 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 
 	alias TU = Unqual!T;
 
+	static if (isInstanceOf!(Nullable, TU))
+	{
+		alias RT = TU;
+		alias AT = Unqual!(typeof(T.get));
+	}
+	else
+	{
+		alias RT = Nullable!T;
+		alias AT = TU;
+	}
+
 	static if (isSomeString!TU)
 	{
 		string str = cast(string)bytes[0 .. len];
 		return Nullable!string(str);
 	}
 	else static if (is(TU == ubyte[]))
-		return Nullable!T(bytes.dup);
-	else static if (isArray!T)
+		return RT(bytes.dup);
+	else static if (isArray!AT)
 	{
 		auto arr = PGArray(bytes);
-		return Nullable!T(cast(T)arr);
+		return RT(cast(AT)arr);
 	}
 	else static if (is(TU == SysTime))
 	{
 		SysTime t = SysTime(fromBytes!long(bytes) * 10 + SysTime(POSTGRES_EPOCH).stdTime);
-		return Nullable!SysTime(t);
+		return RT(t);
 	}
 	else
-		return Nullable!T(bigEndianToNative!(T, T.sizeof)(bytes.to!(ubyte[T.sizeof])));
+		return RT(bigEndianToNative!(AT, AT.sizeof)(bytes.to!(ubyte[AT.sizeof])));
 }
 
 unittest

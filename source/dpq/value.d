@@ -176,15 +176,12 @@ struct Value
 		if (val.isNull)
 		{
 			// NULL values are represented as a single byte with the value of -1
-			_size = 1;
-			_valueBytes = [cast(byte) -1];
+			_size = 0;
+			_valueBytes = null;
 			_isNull = true;
 		}
 		else
-		{
-			_size = typeof(val.get).sizeof;
-			_valueBytes = nativeToBigEndian(val.get).dup;
-		}
+			opAssign(val.get());
 
 		_type = typeOid!T;
 	}
@@ -275,13 +272,26 @@ struct Value
 		return _valueBytes.ptr;
 	}
 
-	Nullable!T as(T)()
+	T as(T)()
+		if (isInstanceOf!(Nullable, T))
 	{
+		alias RT = ReturnType!(T.get);
+		return as!(Unqual!RT);
+	}
+
+	Nullable!T as(T)()
+		if (!isInstanceOf!(Nullable, T))
+	{
+		static if (isInstanceOf!(Nullable, T))
+			alias RT = Unqual!(ReturnType!(T.get));
+		else
+			alias RT = Unqual!T;
+
 		if (_isNull)
-			return Nullable!T.init;
+			return Nullable!RT.init;
 
 		const(ubyte)[] data = _valueBytes[0 .. _size];
-		return fromBytes!T(data, _size);
+		return fromBytes!RT(data, _size);
 	}
 
 	unittest
