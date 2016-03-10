@@ -1279,9 +1279,17 @@ T deserialise(T)(Row r, string prefix = "")
 			__traits(getMember, res, m) = deserialise!mType(r, embeddedPrefix!mType ~ prefix);
 		else
 		{
-			auto x = r[prefix ~ n].as!(typeof(mixin("res." ~ m)));
-			if (!x.isNull)
-				__traits(getMember, res, m) = x;
+			try
+			{
+				auto x = r[prefix ~ n].as!(typeof(mixin("res." ~ m)));
+				if (!x.isNull)
+					__traits(getMember, res, m) = x;
+			}
+			catch (DPQException e) 
+			{
+				if (!isInstanceOf!(Nullable, typeof(__traits(getMember, res, m))))
+					throw e;
+			}
 		}
 	}
 	return res;
