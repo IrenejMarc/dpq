@@ -338,7 +338,6 @@ unittest
 		@embed Test2 inner;
 	}
 
-	pragma(msg, ShouldRecurse!(Test.inner));
 	static assert(AttributeList!Test[0] == Column("id", "id"));
 	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_bar"));
 	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_baz"));

@@ -75,10 +75,11 @@ string sqlType(T)()
 */
 template BaseType(T)
 {
+	import std.typecons : TypedefType;
 	static if (isArray!T && !isSomeString!T)
 		alias BaseType = BaseType!(ForeachType!T);
 	else
-		alias BaseType = Unqual!T;
+		alias BaseType = TypedefType!(Unqual!T);
 }
 
 unittest

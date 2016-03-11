@@ -392,7 +392,7 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 	}
 	else
 	{
-		auto res = T(bigEndianToNative!(AT, AT.sizeof)(bytes.to!(ubyte[AT.sizeof])));
+		TU res = bigEndianToNative!(AT, AT.sizeof)(bytes.to!(ubyte[AT.sizeof]));
 		return RT(res);
 	}
 }

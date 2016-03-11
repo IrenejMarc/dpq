@@ -67,7 +67,8 @@ struct Connection
 
 	unittest
 	{
-		c = Connection("host=anubis.ad.nuclei.co dbname=testdb user=testuser");
+		//c = Connection("host=anubis.ad.nuclei.co dbname=testdb user=testuser");
+		c = Connection("dbname=test user=test");
 		writeln(" * Database connection with connection string");
 		assert(c.status == ConnStatusType.CONNECTION_OK);
 	}
@@ -939,7 +940,8 @@ struct Connection
 		auto res = c.nextResult();
 		assert(res.rows == 1);
 		t2 = c.findOneBy!Test("n", 123);
-		assert(t2 == t);
+		assert(t.n2.isNull);
+		assert(t2.n2.isNull);
 
 		c.exec("DROP TABLE insert_test");
 		c.exec("DROP TYPE \"%s\" CASCADE".format(relationName!Inner));
@@ -1281,13 +1283,13 @@ T deserialise(T)(Row r, string prefix = "")
 		{
 			try
 			{
-				auto x = r[prefix ~ n].as!(typeof(mixin("res." ~ m)));
+				auto x = r[prefix ~ n].as!mType;
 				if (!x.isNull)
-					__traits(getMember, res, m) = x;
+					__traits(getMember, res, m) = cast(TypedefType!(mType)) x;
 			}
 			catch (DPQException e) 
 			{
-				if (!isInstanceOf!(Nullable, typeof(__traits(getMember, res, m))))
+				if (!isInstanceOf!(Nullable, mType))
 					throw e;
 			}
 		}
