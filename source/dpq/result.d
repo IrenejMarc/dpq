@@ -199,7 +199,7 @@ struct Result
 		assert(r.columnName(2) == "col3");
 	}
 
-	int opApply(int delegate(ref Row) dg)
+	int opApply(int delegate(Row) dg)
 	{
 		int result = 0;
 
@@ -207,6 +207,20 @@ struct Result
 		{
 			auto row = Row(i, this);
 			result = dg(row);
+			if (result)
+				break;
+		}
+		return result;
+	}
+
+	int opApply(int delegate(int, Row) dg)
+	{
+		int result = 0;
+
+		for (int i = 0; i < this.rows; ++i)
+		{
+			auto row = Row(i, this);
+			result = dg(i, row);
 			if (result)
 				break;
 		}
@@ -352,19 +366,12 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 	import std.datetime;
 	import std.bitmanip;
 	import std.conv : to;
+	import std.typecons : TypedefType;
 
 	alias TU = Unqual!T;
 
-	static if (isInstanceOf!(Nullable, TU))
-	{
-		alias RT = TU;
-		alias AT = Unqual!(typeof(T.get));
-	}
-	else
-	{
-		alias RT = Nullable!T;
-		alias AT = TU;
-	}
+	alias RT = Nullable!T;
+	alias AT = TypedefType!TU;
 
 	static if (isSomeString!TU)
 	{
@@ -384,7 +391,10 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 		return RT(t);
 	}
 	else
-		return RT(bigEndianToNative!(AT, AT.sizeof)(bytes.to!(ubyte[AT.sizeof])));
+	{
+		auto res = T(bigEndianToNative!(AT, AT.sizeof)(bytes.to!(ubyte[AT.sizeof])));
+		return RT(res);
+	}
 }
 
 unittest

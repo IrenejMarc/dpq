@@ -938,7 +938,7 @@ struct Connection
 		
 		auto res = c.nextResult();
 		assert(res.rows == 1);
-		t2 = c.findOneBy!Test("n", 1);
+		t2 = c.findOneBy!Test("n", 123);
 		assert(t2 == t);
 
 		c.exec("DROP TABLE insert_test");

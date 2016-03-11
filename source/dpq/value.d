@@ -10,7 +10,7 @@ import derelict.pq.pq;
 import std.algorithm : map;
 import std.array;
 import std.conv : to;
-import std.typecons : Nullable;
+import std.typecons : Nullable, TypedefType;
 import std.bitmanip;
 import std.traits;
 import std.datetime : SysTime, DateTime;
@@ -165,7 +165,7 @@ struct Value
 
 		//_valueBytes = new ubyte[_size];
 		//write(_valueBytes, val, 0);
-		_valueBytes = nativeToBigEndian(val).dup;
+		_valueBytes = nativeToBigEndian(val.to!(TypedefType!T)).dup;
 
 		_type = typeOid!T;
 	}
@@ -296,6 +296,8 @@ struct Value
 
 	unittest
 	{
+		import std.typecons : Typedef;
+
 		writeln("\t * as");
 
 		Value v = "123";
@@ -306,6 +308,11 @@ struct Value
 
 		v = [[1, 2], [3, 4]];
 		assert(v.as!(int[][]) == [[1, 2],[3, 4]]);
+
+		alias MyInt = Typedef!int;
+		MyInt x = 2;
+		v = x;
+		assert(v.as!MyInt == x);
 	}
 }
 
