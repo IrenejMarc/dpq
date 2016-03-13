@@ -75,14 +75,8 @@ struct PGTypeAttribute
 	string type;
 }
 
-struct IgnoreAttribute
-{
-}
-
-@property IgnoreAttribute ignore()
-{
-	return IgnoreAttribute();
-}
+enum IgnoreAttribute;
+alias ignore = IgnoreAttribute;
 
 struct IndexAttribute
 {
@@ -288,7 +282,7 @@ template AttributeList2(
 	{
 		alias mt = typeof(mixin("T." ~ fields[0]));
 
-		static if (ignorePK && isPK!(T, fields[0]))
+		static if (ignorePK && isPK!(T, fields[0]) || hasUDA!(IgnoreAttribute, mixin("T." ~ fields[0])))
 			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
 		else static if (ShouldRecurse!(mixin("T." ~ fields[0])))
 		{
@@ -415,35 +409,23 @@ unittest
 	static assert(serialisableMembers!Test[1] == "b");
 }
 
-template filterSerialisableMembers(T, FIELDS...)
+template filterSerialisableMembers(T, fields...)
 {
-	static if (FIELDS.length > 1) {
-		alias filterSerialisableMembers = TypeTuple!(
-			filterSerialisableMembers!(T, FIELDS[0 .. $/2]),
-			filterSerialisableMembers!(T, FIELDS[$/2 .. $]));
-	} else static if (FIELDS.length == 1) {
-		//alias T = T;
-		enum mname = FIELDS[0];
-		static if (isRWPlainField!(T, mname) || isRWField!(T, mname)) 
-		{
-			alias tup = TypeTuple!(__traits(getMember, T, FIELDS[0]));
-			static if (tup.length != 1) 
-			{
-				alias filterSerialisableMembers = TypeTuple!(mname);
-			}
-			else 
-			{
-				static if (!hasUDA!(IgnoreAttribute, __traits(getMember, T, mname)))
-					alias filterSerialisableMembers = TypeTuple!(mname);
-				else
-					alias filterSerialisableMembers = TypeTuple!();
-			}
-		} 
-		else 
-			alias filterSerialisableMembers = TypeTuple!();
-	} 
-	else 
+	static if (fields.length == 0)
 		alias filterSerialisableMembers = TypeTuple!();
+	else
+	{
+		enum m = fields[0];
+		static if (isRWPlainField!(T, m) || isRWField!(T, m))
+		{
+			static if (!hasUDA!(mixin("T." ~ m), IgnoreAttribute))
+				alias filterSerialisableMembers = TypeTuple!(TypeTuple!(m), filterSerialisableMembers!(T, fields[1 .. $]));
+			else
+				alias filterSerialisableMembers = filterSerialisableMembers!(T, fields[1 .. $]);
+		}
+		else 
+			alias filterSerialisableMembers = filterSerialisableMembers!(T, fields[1 .. $]);
+	} 
 }
 
 
