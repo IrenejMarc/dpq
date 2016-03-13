@@ -863,7 +863,7 @@ struct Connection
 	{
 		foreach (m; serialisableMembers!T)
 		{
-			static if (isPK!(T, m) || hasUDA!(IgnoreAttribute, mixin("T." ~ m)))
+			static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
 				continue;
 			else static if (ShouldRecurse!(mixin("T." ~ m)))
 				addVals!(typeof(mixin("T." ~ m)))(qb, __traits(getMember, val, m));
