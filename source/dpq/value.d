@@ -324,6 +324,8 @@ template typeOid(T)
 			alias BT = BaseType!T;
 			static if (is(BT == int))
 				enum typeOid = Type.INT4ARRAY;
+			else static if (is(BT == long))
+				enum typeOid = Type.ANYARRAY;
 			else static if (is(BT == short))
 				enum typeOid = Type.INT2ARRAY;
 			else static if (is(BT == float))
