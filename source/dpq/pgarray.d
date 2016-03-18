@@ -261,29 +261,45 @@ struct PGArray
 			throw new DPQException("Cannot convert array to " ~ T.stringof ~ " (dimensions do not match)");
 
 		int offset = 0;
-		T assemble(T)(int dim = 0)
-		{
-			alias FT = ForeachType!T; // must check if this is an array and then recurse more
-			T res;
+		T res;
 
+		T assemble(T)(int dim = 0)
+			if (isArray!T)
+		{
+			T arr;
+			alias FT = ForeachType!T; // must check if this is an array and then recurse more
+
+			// Recurse
 			static if (isArray!FT)
 			{
+				static if (isDynamicArray!FT)
+					arr.length = dimSizes[dim];
+
 				foreach (i; 0 .. dimSizes[dim])
-					res ~= assemble!FT(dim + 1);
+					arr[i] = assemble!FT(dim + 1);
+
+				return arr.to!T;
 			}
+			// Last dimension
 			else
 			{
 				T inner;
+
+				static if (isDynamicArray!T)
+					inner.length = dimSizes[dim];
+
 				foreach (i; 0 .. dimSizes[dim])
 				{
 					// Do stuff with slices as to not consume the array
 					// and also trigger a range error if something is wrong
-					inner ~= bigEndianToNative!FT(value[offset .. offset + elementSize].to!(ubyte[FT.sizeof]));
+
+					// Arrays are assembled LTR, so global offset can be used
+					inner[i] = bigEndianToNative!FT(value[offset .. offset + elementSize].to!(ubyte[FT.sizeof]));
 					offset += elementSize;
 				}
-				res ~= inner;
+
+				return inner.to!T;
 			}
-			return res;
 		}
 
 		return assemble!T();
@@ -300,6 +316,9 @@ struct PGArray
 		assert(cast(int[]) PGArray(ints) == ints, "ints");
 		assert(cast(long[]) PGArray(longs) == longs, "longs");
 		assert(cast(bool[]) PGArray(bools) == bools, "bools");
+
+		int[3] threeInts = [1,2,3];
+		assert(cast(int[3]) PGArray(threeInts) == threeInts);
 	}
 }
 
