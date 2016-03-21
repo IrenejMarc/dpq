@@ -861,12 +861,22 @@ struct Connection
 
 	private void addVals(T, U)(ref QueryBuilder qb, U val)
 	{
+		template NoNullable(T)
+		{
+			static if (isInstanceOf!(Nullable, T))
+				// Nullable nullable? Costs us nothing, so why not
+				alias NoNullable = NoNullable!(Unqual!(ReturnType!(T.get)));
+			else
+				alias NoNullable = T;
+
+		}
+
 		foreach (m; serialisableMembers!T)
 		{
 			static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
 				continue;
 			else static if (ShouldRecurse!(mixin("T." ~ m)))
-				addVals!(typeof(mixin("T." ~ m)))(qb, __traits(getMember, val, m));
+				addVals!(NoNullable!(typeof(mixin("T." ~ m))))(qb, __traits(getMember, val, m));
 			else
 				qb.addValue(__traits(getMember, val, m));
 		}
