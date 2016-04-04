@@ -60,6 +60,7 @@ package enum Type : Oid
 	INT2ARRAY = 1005,
 	INT4ARRAY = 1007,
 	TEXTARRAY = 1009,
+	INT8ARRAY = 1016,
 	OIDARRAY = 1028,
 	FLOAT4ARRAY = 1021,
 	ACLITEM = 1033,
@@ -325,7 +326,7 @@ template typeOid(T)
 			static if (is(BT == int))
 				enum typeOid = Type.INT4ARRAY;
 			else static if (is(BT == long))
-				enum typeOid = Type.ANYARRAY;
+				enum typeOid = Type.INT8ARRAY;
 			else static if (is(BT == short))
 				enum typeOid = Type.INT2ARRAY;
 			else static if (is(BT == float))
