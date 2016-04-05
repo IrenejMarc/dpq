@@ -38,9 +38,9 @@ struct Result
 
 		switch (status)
 		{
-			case ExecStatusType.PGRES_EMPTY_QUERY:
-			case ExecStatusType.PGRES_BAD_RESPONSE:
-			case ExecStatusType.PGRES_FATAL_ERROR:
+			case PGRES_EMPTY_QUERY:
+			case PGRES_BAD_RESPONSE:
+			case PGRES_FATAL_ERROR:
 			{
 				string err = PQresultErrorMessage(res).fromStringz.to!string;
 				throw new DPQException(status.to!string ~ " " ~ err);

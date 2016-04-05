@@ -59,7 +59,7 @@ struct Connection
 
 		_connection = new ConnectionPtr(PQconnectdb(connString.toStringz));
 
-		if (status != ConnStatusType.CONNECTION_OK)
+		if (status != CONNECTION_OK)
 			throw new DPQException(errorMessage);
 
 		_dpqLastConnection = &this;
@@ -257,7 +257,7 @@ struct Connection
 				cStr,
 				params.length.to!int,
 				pTypes.ptr,
-				pValues.ptr,
+				cast(const(char*)*)pValues.ptr,
 				pLengths.ptr,
 				pFormats.ptr,
 				1);
@@ -270,7 +270,7 @@ struct Connection
 					cStr, 
 					params.length.to!int,
 					pTypes.ptr, 
-					pValues.ptr,
+					cast(const(char*)*)pValues.ptr,
 					pLengths.ptr,
 					pFormats.ptr,
 					1));
