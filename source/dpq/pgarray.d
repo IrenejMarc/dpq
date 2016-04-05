@@ -1,7 +1,7 @@
 module dpq.pgarray;
 
-import derelict.pq.pq : Oid;
-
+//import derelict.pq.pq : Oid;
+import libpq.libpq : Oid;
 import std.traits;
 import std.bitmanip;
 import std.conv;

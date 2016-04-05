@@ -5,7 +5,8 @@ import dpq.exception;
 import dpq.pgarray;
 import dpq.meta;
 
-import derelict.pq.pq;
+//import derelict.pq.pq;
+import libpq.libpq;
 
 import std.algorithm : map;
 import std.array;

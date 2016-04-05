@@ -1,7 +1,7 @@
 name "dpq"
 description "A postgresql (libpq, pq) library aiming to be simple to use"
 copyright "Copyright © 2016, Irenej Marc"
-dependency "derelict-pq" version="2.0.1"
 authors "Irenej"
 targetType "library"
 license "MIT"
+libs "pq"

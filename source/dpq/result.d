@@ -1,6 +1,7 @@
 module dpq.result;
 
-import derelict.pq.pq;
+//import derelict.pq.pq;
+import libpq.libpq;
 
 import std.stdio;
 import std.string;
@@ -143,7 +144,7 @@ struct Result
 		if (PQgetisnull(_result, row, col))
 			return Value(null);
 
-		const(ubyte)* data = PQgetvalue(_result, row, col);
+		const(ubyte)* data = cast(ubyte *)PQgetvalue(_result, row, col);
 		int len = PQgetlength(_result, row, col);
 		Oid oid = PQftype(_result, col);
 		
