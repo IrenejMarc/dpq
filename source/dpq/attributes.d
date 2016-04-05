@@ -263,9 +263,12 @@ unittest
 	static assert(!isPK!(Test, "a"));
 }
 
-template embeddedPrefix(T)
+template embeddedPrefix(alias T)
 {
-	enum embeddedPrefix =  "_" ~ relationName!T ~ "_";
+	import std.string : format;
+	enum embeddedPrefix ="_%s_%s_".format(
+			relationName!T,
+			SnakeCase!(T.stringof));
 }
 
 template AttributeList2(
@@ -333,16 +336,16 @@ unittest
 	}
 
 	static assert(AttributeList!Test[0] == Column("id", "id"));
-	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_bar"));
-	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_baz"));
+	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_test2_bar"));
+	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_test2_baz"));
 
 	// ignorePK
-	static assert(AttributeList!(Test, true)[0] == Column("(\"inner\").bar", "_test2_bar"));
-	static assert(AttributeList!(Test, true)[1] == Column("(\"inner\").baz", "_test2_baz"));
+	static assert(AttributeList!(Test, true)[0] == Column("(\"inner\").bar", "_test2_test2_bar"));
+	static assert(AttributeList!(Test, true)[1] == Column("(\"inner\").baz", "_test2_test2_baz"));
 
  // INSERT syntax, with ignorePK
-	static assert(AttributeList!(Test, true, true)[0] == Column("\"inner\".bar", "_test2_bar"));
-	static assert(AttributeList!(Test, true, true)[1] == Column("\"inner\".baz", "_test2_baz"));
+	static assert(AttributeList!(Test, true, true)[0] == Column("\"inner\".bar", "_test2_test2_bar"));
+	static assert(AttributeList!(Test, true, true)[1] == Column("\"inner\".baz", "_test2_test2_baz"));
 }
 
 template AttributeList(T, bool ignorePK = false, bool insert = false)
