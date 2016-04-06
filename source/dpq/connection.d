@@ -1288,7 +1288,7 @@ T deserialise(T)(Row r, string prefix = "")
 		alias mType = typeof(mixin("T." ~ m));
 
 		static if (ShouldRecurse!(__traits(getMember, res, m)))
-			__traits(getMember, res, m) = deserialise!mType(r, embeddedPrefix!mType ~ prefix);
+			__traits(getMember, res, m) = deserialise!mType(r, embeddedPrefix!(mType, n) ~ prefix);
 		else
 		{
 			try

@@ -263,12 +263,12 @@ unittest
 	static assert(!isPK!(Test, "a"));
 }
 
-template embeddedPrefix(alias T)
+template embeddedPrefix(T, string name)
 {
 	import std.string : format;
 	enum embeddedPrefix ="_%s_%s_".format(
 			relationName!T,
-			SnakeCase!(T.stringof));
+			SnakeCase!name);
 }
 
 template AttributeList2(
@@ -289,16 +289,17 @@ template AttributeList2(
 			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
 		else static if (ShouldRecurse!(mixin("T." ~ fields[0])))
 		{
+			enum aName = attributeName!(mixin("T." ~ fields[0]));
 			static if (insert)
-				enum pref = "\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\".";
+				enum pref = "\"" ~ aName ~ "\".";
 			else
-				enum pref = "(\"" ~ attributeName!(mixin("T." ~ fields[0])) ~ "\").";
+				enum pref = "(\"" ~ aName ~ "\").";
 
 			alias mType = typeof(mixin("T." ~ fields[0]));
 			enum AttributeList2 = AttributeList2!(
 					mType,
 					pref ~ prefix,
-					embeddedPrefix!mType ~ asPrefix,
+					embeddedPrefix!(mType, aName) ~ asPrefix,
 					ignorePK,
 					insert,
 					serialisableMembers!(typeof(mixin("T." ~ fields[0])))) ~
@@ -336,16 +337,16 @@ unittest
 	}
 
 	static assert(AttributeList!Test[0] == Column("id", "id"));
-	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_test2_bar"));
-	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_test2_baz"));
+	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_inner_bar"));
+	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_inner_baz"));
 
 	// ignorePK
-	static assert(AttributeList!(Test, true)[0] == Column("(\"inner\").bar", "_test2_test2_bar"));
-	static assert(AttributeList!(Test, true)[1] == Column("(\"inner\").baz", "_test2_test2_baz"));
+	static assert(AttributeList!(Test, true)[0] == Column("(\"inner\").bar", "_test2_inner_bar"));
+	static assert(AttributeList!(Test, true)[1] == Column("(\"inner\").baz", "_test2_inner_baz"));
 
  // INSERT syntax, with ignorePK
-	static assert(AttributeList!(Test, true, true)[0] == Column("\"inner\".bar", "_test2_test2_bar"));
-	static assert(AttributeList!(Test, true, true)[1] == Column("\"inner\".baz", "_test2_test2_baz"));
+	static assert(AttributeList!(Test, true, true)[0] == Column("\"inner\".bar", "_test2_inner_bar"));
+	static assert(AttributeList!(Test, true, true)[1] == Column("\"inner\".baz", "_test2_inner_baz"));
 }
 
 template AttributeList(T, bool ignorePK = false, bool insert = false)
@@ -372,7 +373,7 @@ deprecated("Use compile-time AttributeList!T instead")
 				if (insert)
 					addMems!mType("\"%s\".%s".format(attrName, prefix));
 				else
-					addMems!mType("(\"%s\").%s".format(attrName, prefix), embeddedPrefix!mType);
+					addMems!mType("(\"%s\").%s".format(attrName, prefix), embeddedPrefix!(mixin("T." ~ m)));
 			}
 			else
 			{
