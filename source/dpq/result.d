@@ -1,6 +1,7 @@
 module dpq.result;
 
 import derelict.pq.pq;
+import std.conv : to;
 
 import std.stdio;
 import std.string;

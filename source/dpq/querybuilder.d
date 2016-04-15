@@ -9,6 +9,8 @@ import dpq.column;
 import std.typecons;
 import std.string;
 
+import std.algorithm : map;
+
 version (unittest) import std.stdio;
 
 
