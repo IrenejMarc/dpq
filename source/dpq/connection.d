@@ -494,7 +494,7 @@ struct Connection
 	*/
 	Nullable!T findOne(T, U)(U id)
 	{
-		return findOneBy!T(primaryKeyName!T, id);
+		return findOneBy!T(primaryKeyAttributeName!T, id);
 	}
 
 	unittest
@@ -755,7 +755,7 @@ struct Connection
 
 		qb.update(relationName!T)
 			.set(updates)
-			.where(primaryKeyName!T, id);
+			.where(primaryKeyAttributeName!T, id);
 
 		auto q = qb.query(this);
 
@@ -803,7 +803,7 @@ struct Connection
 		QueryBuilder qb;
 
 		qb.update(relationName!T)
-			.where(primaryKeyName!T, id);
+			.where(primaryKeyAttributeName!T, id);
 
 		foreach (m; serialisableMembers!T)
 			qb.set(attributeName!(mixin("T." ~ m)), __traits(getMember, updates, m));
@@ -966,7 +966,7 @@ struct Connection
 	{
 		QueryBuilder qb;
 		qb.remove!T
-			.where(primaryKeyName!T, id);
+			.where(primaryKeyAttributeName!T, id);
 
 		return qb.query(this).run().rows;
 	}
@@ -975,7 +975,7 @@ struct Connection
 	{
 		QueryBuilder qb;
 		qb.remove!T
-			.where(primaryKeyName!T, id);
+			.where(primaryKeyAttributeName!T, id);
 
 		return qb.query(this).runAsync() == 1;
 	}

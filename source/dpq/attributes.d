@@ -233,6 +233,11 @@ template primaryKeyName(T)
 	enum primaryKeyName = mixin(fields[0].stringof);
 }
 
+template primaryKeyAttributeName(T)
+{
+	enum primaryKeyAttributeName = attributeName!(mixin("T." ~ primaryKeyName!T));
+}
+
 unittest
 {
 	writeln("\t * primaryKeyName");
@@ -243,6 +248,10 @@ unittest
 	}
 
 	static assert(primaryKeyName!Test == "myPK");
+
+	writeln("\t * primaryKeyAttributeName");
+
+	static assert(primaryKeyAttributeName!Test == "my_pk");
 }
 
 template isPK(alias T, string m)
