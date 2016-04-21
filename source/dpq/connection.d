@@ -370,7 +370,7 @@ struct Connection
 					alias tu = Unqual!t;
 					static if (ShouldRecurse!(mixin("type." ~ m)))
 					{
-						ensureSchema!tu(true);
+						ensureSchema!(NoNullable!tu)(true);
 						cols ~= '"' ~ relationName!tu ~ '"';
 					}
 					else
@@ -861,16 +861,6 @@ struct Connection
 
 	private void addVals(T, U)(ref QueryBuilder qb, U val)
 	{
-		template NoNullable(T)
-		{
-			static if (isInstanceOf!(Nullable, T))
-				// Nullable nullable? Costs us nothing, so why not
-				alias NoNullable = NoNullable!(Unqual!(ReturnType!(T.get)));
-			else
-				alias NoNullable = T;
-
-		}
-
 		foreach (m; serialisableMembers!T)
 		{
 			static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
@@ -1285,10 +1275,10 @@ T deserialise(T)(Row r, string prefix = "")
 	foreach (m; serialisableMembers!T)
 	{
 		enum n = attributeName!(mixin("T." ~ m));
-		alias mType = typeof(mixin("T." ~ m));
+		alias mType = Unqual!(typeof(mixin("T." ~ m)));
 
 		static if (ShouldRecurse!(__traits(getMember, res, m)))
-			__traits(getMember, res, m) = deserialise!mType(r, embeddedPrefix!(mType, n) ~ prefix);
+			__traits(getMember, res, m) = deserialise!(NoNullable!mType)(r, embeddedPrefix!(mType, n) ~ prefix);
 		else
 		{
 			try

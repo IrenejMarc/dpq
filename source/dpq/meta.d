@@ -188,14 +188,27 @@ unittest
 }
 
 
+/// Removes any Nullable specifiers, even multiple levels
+template NoNullable(T)
+{
+	static if (isInstanceOf!(Nullable, T))
+		// Nullable nullable? Costs us nothing, so why not
+		alias NoNullable = NoNullable!(Unqual!(ReturnType!(T.get)));
+	else
+		alias NoNullable = T;
+}
+
+
 template ShouldRecurse(alias TA)
 {
-	alias T = typeof(TA);
+	alias T = NoNullable!(typeof(TA));
 	static if (is(T == class) || is(T == struct))
+	{
 		static if (hasUDA!(TA, EmbedAttribute))
 			enum ShouldRecurse = true;
 		else
 			enum ShouldRecurse = false;
+	}
 	else
 		enum ShouldRecurse = false;
 }
