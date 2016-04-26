@@ -1,0 +1,10 @@
+.dub
+.directory
+dub.selections.json
+*.a
+*.so
+*.lib
+*.dll
+dub.userprefs
+__test__library__
+*.kate-swp

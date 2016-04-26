@@ -1,6 +1,7 @@
 module dpq.connection;
 
-import derelict.pq.pq;
+//import derelict.pq.pq;
+import libpq.libpq;
 
 import dpq.exception;
 import dpq.result;
@@ -12,7 +13,8 @@ import dpq.prepared;
 import dpq.smartptr;
 
 import std.string;
-import derelict.pq.pq;
+//import derelict.pq.pq;
+import libpq.libpq;
 import std.conv : to;
 import std.traits;
 import std.typecons;
@@ -59,7 +61,7 @@ struct Connection
 
 		_connection = new ConnectionPtr(PQconnectdb(connString.toStringz));
 
-		if (status != ConnStatusType.CONNECTION_OK)
+		if (status != CONNECTION_OK)
 			throw new DPQException(errorMessage);
 
 		_dpqLastConnection = &this;
@@ -70,7 +72,7 @@ struct Connection
 		//c = Connection("host=anubis.ad.nuclei.co dbname=testdb user=testuser");
 		c = Connection("dbname=test user=test");
 		writeln(" * Database connection with connection string");
-		assert(c.status == ConnStatusType.CONNECTION_OK);
+		assert(c.status == CONNECTION_OK);
 	}
 
 	/** 
@@ -257,7 +259,7 @@ struct Connection
 				cStr,
 				params.length.to!int,
 				pTypes.ptr,
-				pValues.ptr,
+				cast(const(char*)*)pValues.ptr,
 				pLengths.ptr,
 				pFormats.ptr,
 				1);
@@ -270,7 +272,7 @@ struct Connection
 					cStr, 
 					params.length.to!int,
 					pTypes.ptr, 
-					pValues.ptr,
+					cast(const(char*)*)pValues.ptr,
 					pLengths.ptr,
 					pFormats.ptr,
 					1));
@@ -1300,8 +1302,3 @@ T deserialise(T)(Row r, string prefix = "")
 /// Hold the last created connection, not to be used outside the library
 package Connection* _dpqLastConnection;
 
-/// Loads the derelict-pq library at runtime
-shared static this()
-{
-	DerelictPQ.load();
-}

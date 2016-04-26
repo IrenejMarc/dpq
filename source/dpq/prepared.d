@@ -1,7 +1,7 @@
 module dpq.prepared;
 
-import derelict.pq.pq;
-
+//import derelict.pq.pq;
+import libpq.libpq;
 import dpq.connection;
 import dpq.result;
 
