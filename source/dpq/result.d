@@ -147,7 +147,6 @@ struct Result
 		const(ubyte)* data = cast(ubyte *) PQgetvalue(_result, row, col);
 		int len = PQgetlength(_result, row, col);
 		Oid oid = PQftype(_result, col);
-		writefln("Received bytes: %s", data[0 .. len]);
 		
 		return Value(data, len, cast(Type) oid);
 	}
@@ -432,12 +431,9 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 			Oid oid = cast(Oid) bytes.read!int;
 			auto length = bytes.read!int;
 
-			writefln("Checking %s", mName);
 			// null value
 			if (length == -1)
 				continue;
-
-			writefln("Setting value of: %s", mName);
 
 			static if (is(MT == class) || is(MT == struct))
 			{
