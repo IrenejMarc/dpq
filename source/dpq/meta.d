@@ -199,6 +199,7 @@ template NoNullable(T)
 }
 
 
+deprecated("we don't do recursing anymore")
 template ShouldRecurse(alias TA)
 {
 	alias T = NoNullable!(typeof(TA));

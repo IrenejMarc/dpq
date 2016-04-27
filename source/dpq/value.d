@@ -4,6 +4,8 @@ import dpq.result;
 import dpq.exception;
 import dpq.pgarray;
 import dpq.meta;
+import dpq.attributes;
+import dpq.connection;
 
 //import derelict.pq.pq;
 import libpq.libpq;
@@ -111,6 +113,8 @@ package enum Type : Oid
 	ANYRANGE = 3831,
 }
 
+package Oid[string] customTypes;
+
 struct Value
 {
 	private
@@ -160,14 +164,55 @@ struct Value
 		_type = typeOid!T;
 	}
 
+
+	private ubyte[] compositeTypeRepresentation(T)(T val)
+		if (is(T == class) || is(T == struct))
+	{
+
+		alias members = serialisableMembers!T;
+		ubyte[] bytes;
+
+		size_t index = 0;
+		if (isAnyNull(val))
+			return nativeToBigEndian(cast(int) -1).dup;
+		else	
+			bytes ~= nativeToBigEndian(cast(int) members.length);
+
+		foreach (mName; members)
+		{
+			auto m = __traits(getMember, val, mName);
+			alias MT = NoNullable!(typeof(m));
+
+			static if (is(MT == class) || is(MT == struct))
+			{
+				auto bs = compositeTypeRepresentation(m);
+				bytes ~= nativeToBigEndian(cast(int) oidForType!MT);
+				//bytes ~= nativeToBigEndian(bs.length.to!int);
+				bytes ~= bs;
+			}
+			else
+			{
+				bytes ~= nativeToBigEndian(cast(int) typeOid!MT);
+				bytes ~= nativeToBigEndian(MT.sizeof.to!int);
+				bytes ~= nativeToBigEndian(m);
+			}
+		}
+
+		return bytes;
+	}
+
 	void opAssign(T)(T val)
 			if(!isArray!T && !isInstanceOf!(Nullable, T))
 	{
 		_size = val.sizeof;
 
-		//_valueBytes = new ubyte[_size];
-		//write(_valueBytes, val, 0);
-		_valueBytes = nativeToBigEndian(val.to!(TypedefType!T)).dup;
+		static if (is(T == class) || is (T == struct))
+		{
+			_valueBytes = compositeTypeRepresentation(val);
+			_size = _valueBytes.length.to!int;
+		}
+		else
+			_valueBytes = nativeToBigEndian(val.to!(TypedefType!T)).dup;
 
 		_type = typeOid!T;
 	}
@@ -381,6 +426,22 @@ template typeOid(T)
 				// Try to infer
 				enum typeOid = Type.INFER;
 		}
+}
+
+// TODO: this for arrays
+Type oidForType(T)()
+		if (!isArray!T)
+{
+	auto oid = typeOid!T;
+
+	if (oid == Type.INFER)
+	{
+		Oid* p;
+		if ((p = relationName!T in _dpqCustomOIDs) != null)
+			oid = cast(Type) *p;
+	}
+
+	return cast(Type) oid;
 }
 
 unittest

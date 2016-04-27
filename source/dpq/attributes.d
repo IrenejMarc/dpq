@@ -294,26 +294,9 @@ template AttributeList2(
 	{
 		alias mt = typeof(mixin("T." ~ fields[0]));
 
+		// Ignore the PK
 		static if (ignorePK && isPK!(T, fields[0]) || hasUDA!(IgnoreAttribute, mixin("T." ~ fields[0])))
 			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
-		else static if (ShouldRecurse!(mixin("T." ~ fields[0])))
-		{
-			enum aName = attributeName!(mixin("T." ~ fields[0]));
-			static if (insert)
-				enum pref = "\"" ~ aName ~ "\".";
-			else
-				enum pref = "(\"" ~ aName ~ "\").";
-
-			alias mType = typeof(mixin("T." ~ fields[0]));
-			enum AttributeList2 = AttributeList2!(
-					mType,
-					pref ~ prefix,
-					embeddedPrefix!(mType, aName) ~ asPrefix,
-					ignorePK,
-					insert,
-					serialisableMembers!(typeof(mixin("T." ~ fields[0])))) ~
-			AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
-		}
 		else
 		{
 			enum attrName = attributeName!(mixin("T." ~ fields[0]));
@@ -332,6 +315,7 @@ template AttributeList2(
 
 unittest
 {
+	import std.typecons : Nullable;
 	writeln("\t * AttributeList");
 	struct Test2
 	{
@@ -346,63 +330,27 @@ unittest
 	}
 
 	static assert(AttributeList!Test[0] == Column("id", "id"));
-	static assert(AttributeList!Test[1] == Column("(\"inner\").bar", "_test2_inner_bar"));
-	static assert(AttributeList!Test[2] == Column("(\"inner\").baz", "_test2_inner_baz"));
+	static assert(AttributeList!Test[1] == Column("inner", "inner"));
 
 	// ignorePK
-	static assert(AttributeList!(Test, true)[0] == Column("(\"inner\").bar", "_test2_inner_bar"));
-	static assert(AttributeList!(Test, true)[1] == Column("(\"inner\").baz", "_test2_inner_baz"));
+	static assert(AttributeList!(Test, true)[0] == Column("inner", "inner"));
 
- // INSERT syntax, with ignorePK
-	static assert(AttributeList!(Test, true, true)[0] == Column("\"inner\".bar", "_test2_inner_bar"));
-	static assert(AttributeList!(Test, true, true)[1] == Column("\"inner\".baz", "_test2_inner_baz"));
+	// INSERT syntax, with ignorePK
+	static assert(AttributeList!(Test, true, true)[0] == Column("inner", "inner"));
+
+
 }
 
 template AttributeList(T, bool ignorePK = false, bool insert = false)
 {
 	alias AttributeList = AttributeList2!(T, "", "", ignorePK, insert, serialisableMembers!(T));
-	static assert(AttributeList.length > 0, "AttributeList found no fields, cannot continue");
+	static assert(AttributeList.length > 0, "AttributeList found no fields, for " ~ T.stringof ~ " cannot continue");
 }
-
-deprecated("Use compile-time AttributeList!T instead")
-	Column[] attributeList(T)(bool ignorePK = false, bool insert = false) pure
-{
-	alias TU = Unqual!T;
-	Column[] res;
-
-	void addMems(T)(string prefix = "", string asPrefix = "")
-	{
-		import std.string : format;
-		foreach(m; serialisableMembers!T)
-		{
-			alias mType = typeof(mixin("T." ~ m));
-			alias attrName = attributeName!(mixin("T." ~ m));
-			static if (is(mType == class) || is(mType == struct))
-			{
-				if (insert)
-					addMems!mType("\"%s\".%s".format(attrName, prefix));
-				else
-					addMems!mType("(\"%s\").%s".format(attrName, prefix), embeddedPrefix!(mixin("T." ~ m)));
-			}
-			else
-			{
-				if (ignorePK && isPK!(T, m))
-					continue;
-
-				res ~= Column("%s\"%s\"".format(prefix, attributeName!(mixin("T." ~ m))),
-						asPrefix ~ attrName);
-			}
-		}
-	}
-	addMems!TU;
-
-	return res;
-}
-alias sqlMembers = attributeList;
 
 template serialisableMembers(T)
 {
-	alias serialisableMembers = filterSerialisableMembers!(T, __traits(allMembers, T));
+	alias NT = NoNullable!T;
+	alias serialisableMembers = filterSerialisableMembers!(NT, __traits(allMembers, NT));
 }
 
 unittest
@@ -538,3 +486,12 @@ template isNonStaticMember(T, string M)
 	}
 }
 
+bool isAnyNull(T)(T val)
+{
+	static if (is(T == class))
+		return val is null;
+	else static if (isInstanceOf!(Nullable, T))
+		return val.isNull;
+	else
+		return false;
+}

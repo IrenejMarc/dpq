@@ -340,10 +340,13 @@ struct Connection
 	{
 		import std.stdio;
 		string[] additional;
+		string[] relations;
 
 		foreach (type; T)
 		{
 			enum name = relationName!(type);
+			relations ~= name;
+
 			string str;
 			if (createType)
 				str = "CREATE TYPE \"" ~ name ~ "\" AS (%s)";
@@ -373,7 +376,7 @@ struct Connection
 					static if (ShouldRecurse!(mixin("type." ~ m)))
 					{
 						ensureSchema!(NoNullable!tu)(true);
-						cols ~= '"' ~ relationName!tu ~ '"';
+						cols ~= '"' ~ relationName!(NoNullable!tu) ~ '"';
 					}
 					else
 						cols ~= SQLType!tu;
@@ -439,8 +442,21 @@ struct Connection
 			{
 				exec(cmd);
 			}
-			catch {} // This just means the constraint/index already exists
+			catch {} // Horrible, I know, but this just means the constraint/index already exists
 		}
+
+		// After we're done creating all the types, a good idea would be to get OIDs for all of them
+		if (relations.length > 0)
+		{
+			auto res = execParams(
+					"SELECT typname, oid FROM pg_type WHERE typname IN ('%s')".format(
+						relations.join("','")));
+
+			foreach (r; res)
+				_dpqCustomOIDs[r[0].as!string] = r[1].as!Oid;
+		}
+
+		
 	}
 
 	unittest
@@ -863,14 +879,17 @@ struct Connection
 
 	private void addVals(T, U)(ref QueryBuilder qb, U val)
 	{
-		foreach (m; serialisableMembers!T)
+		if (isAnyNull(val))
+			qb.addValue(null);
+		else
 		{
-			static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
-				continue;
-			else static if (ShouldRecurse!(mixin("T." ~ m)))
-				addVals!(NoNullable!(typeof(mixin("T." ~ m))))(qb, __traits(getMember, val, m));
-			else
-				qb.addValue(__traits(getMember, val, m));
+			foreach (m; serialisableMembers!(NoNullable!T))
+			{
+				static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
+					continue;
+				else
+					qb.addValue(__traits(getMember, val, m));
+			}
 		}
 	}
 
@@ -1279,21 +1298,16 @@ T deserialise(T)(Row r, string prefix = "")
 		enum n = attributeName!(mixin("T." ~ m));
 		alias mType = Unqual!(typeof(mixin("T." ~ m)));
 
-		static if (ShouldRecurse!(__traits(getMember, res, m)))
-			__traits(getMember, res, m) = deserialise!(NoNullable!mType)(r, embeddedPrefix!(mType, n) ~ prefix);
-		else
+		try
 		{
-			try
-			{
-				auto x = r[prefix ~ n].as!mType;
-				if (!x.isNull)
-					__traits(getMember, res, m) = cast(TypedefType!(mType)) x;
-			}
-			catch (DPQException e) 
-			{
-				if (!isInstanceOf!(Nullable, mType))
-					throw e;
-			}
+			auto x = r[prefix ~ n].as!mType;
+			if (!x.isNull)
+				__traits(getMember, res, m) = cast(TypedefType!(mType)) x;
+		}
+		catch (DPQException e) 
+		{
+			if (!isInstanceOf!(Nullable, mType))
+				throw e;
 		}
 	}
 	return res;
@@ -1301,4 +1315,7 @@ T deserialise(T)(Row r, string prefix = "")
 
 /// Hold the last created connection, not to be used outside the library
 package Connection* _dpqLastConnection;
+
+/// Holds a list of all the OIDs of our custom types, indexed by their relationName
+package Oid[string] _dpqCustomOIDs;
 
