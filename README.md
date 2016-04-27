@@ -13,6 +13,7 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - Reading and writing to array fields (up to 6-dimensions, limited by PostgreSQL)
  - Basic asynchronous query support with Query.runAsync()
  - Prepared statements
+ - Support for SysTime type, saving time in the DB in UTC.
   
 ## Planned features
  - Connection pooling (maybe)
@@ -25,6 +26,7 @@ Documentation is in the code itself, though not complete
 ## Some notes:
  - If a wrong type is specified while fetching a column, the results are undefined. Most likely just garbage
  - Using QueryBuilder, when specifying columns, make sure they are not reserverd SQL keywords, they will not be escaped automatically (wrap keywords in `" "`)
+ - Be careful with using Connection's exec function, since it only returns textual values, that are not currently supported by dpq's value. (execParams can be used even without params and will return binary data)
 
 ## Licence
 MIT, read LICENSE.txt
@@ -38,34 +40,37 @@ import dpq.query;
 import dpq.attributes;
 import dpq.result;
 
+// By default, relation and type names will be snake_cased, resulting in a "user_data" type in this case
 struct UserData
 {
+    // The same snake_casing rules apply to attribute names
 	string firstName;
 	string lastName;
 }
 
-// A relation's name can be specified with the @relation attribute
+// A relation's name can be specified with the @relation attribute, overriding the default
 @relation("users")
 struct User
 {
-	// serial is 4B in size, use serial8 with longs (@serial == @type("SERIAL"))
+	// serial is 4B in size, use serial8 with longs (@serial <=> @type("SERIAL"))
 	@serial @PK int id;
 	
 	// @uniqueIndex will create an unique index, @index non-unique
 	@uniqueIndex string username;
 	@index int posts;
 
-	// Struct inside structs can be used, they will be created as a type
-	UserData userData;
+	// Structs inside structs can be used, they will be created as a type,
+	// @embed must be used for structs that will be embedded
+	@embed UserData userData;
 
-	// ubyte[] will get store as BYTEA
+	// ubyte[] will get stored as BYTEA
 	// Attribute/column names can be specified using the @attribute UDA (@attr is an alias for it)
-	@attr("passwordHash") ubyte[] password;
+	@attr("password_hash") ubyte[] password;
 
 	// Private properties will be ignored, same for @ignore
 	private int _secret;
+	
 	// A getter-setter pair will get (de-)serialised too.
-
 	@property int secret()
 	{
 		return _secret;
@@ -89,8 +94,9 @@ struct Post
 void main()
 {
 	// Establish a connection, will throw if connecting fails or connection string cannot be parsed
-	auto conn = Connection("host=anubis.ad.nuclei.co dbname=testdb user=testuser password='VerySecureTestPassword'");
+	auto conn = Connection("dbname=testdb user=testuser password='VerySecureTestPassword'");
 	
+
 	// One-line query execution, the same could be done with Connection.exec(string command)
 	Query("CREATE TABLE IF NOT EXISTS test (id SERIAL, txt TEXT)").run();
 
@@ -122,7 +128,7 @@ void main()
 	conn.ensureSchema!(User, Post);
 	
 	User newUser;
-	newUser.username = "foobar123999";
+	newUser.username = "foobar123";
 	newUser.userData.firstName = "Foo";
 	newUser.userData.lastName = "Bar";
 
@@ -154,3 +160,4 @@ void main()
 }
 
 ```
+
