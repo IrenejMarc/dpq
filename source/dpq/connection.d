@@ -69,8 +69,7 @@ struct Connection
 
 	unittest
 	{
-		//c = Connection("host=anubis.ad.nuclei.co dbname=testdb user=testuser");
-		c = Connection("dbname=test user=test");
+		c = Connection("host=127.0.0.1 dbname=test user=test");
 		writeln(" * Database connection with connection string");
 		assert(c.status == CONNECTION_OK);
 	}
@@ -951,7 +950,7 @@ struct Connection
 		assert(r2[0][0].as!int == t.n);
 
 		Test t2 = c.findOneBy!Test("n", 1);
-		assert(t2 == t);
+		assert(t2 == t, t.to!string ~ " != " ~ t2.to!string);
 
 		writeln("\t\t * async");
 		t.n = 123;

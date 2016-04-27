@@ -168,7 +168,6 @@ struct Value
 	private ubyte[] compositeTypeRepresentation(T)(T val)
 		if (is(T == class) || is(T == struct))
 	{
-
 		alias members = serialisableMembers!T;
 		ubyte[] bytes;
 
@@ -204,15 +203,16 @@ struct Value
 	void opAssign(T)(T val)
 			if(!isArray!T && !isInstanceOf!(Nullable, T))
 	{
+		alias AT = TypedefType!T;
 		_size = val.sizeof;
 
-		static if (is(T == class) || is (T == struct))
+		static if (is(AT == class) || is (AT == struct))
 		{
 			_valueBytes = compositeTypeRepresentation(val);
 			_size = _valueBytes.length.to!int;
 		}
 		else
-			_valueBytes = nativeToBigEndian(val.to!(TypedefType!T)).dup;
+			_valueBytes = nativeToBigEndian(val.to!AT).dup;
 
 		_type = typeOid!T;
 	}
@@ -329,10 +329,7 @@ struct Value
 	Nullable!T as(T)()
 		if (!isInstanceOf!(Nullable, T))
 	{
-		static if (isInstanceOf!(Nullable, T))
-			alias RT = Unqual!(ReturnType!(T.get));
-		else
-			alias RT = Unqual!T;
+		alias RT = Unqual!T;
 
 		if (_isNull)
 			return Nullable!RT.init;
@@ -358,8 +355,9 @@ struct Value
 
 		alias MyInt = Typedef!int;
 		MyInt x = 2;
-		v = x;
-		assert(v.as!MyInt == x);
+		v = Value(x);
+		writefln("Val is %s", v);
+		assert(v.as!MyInt == x, v.as!(MyInt).to!string ~ " and " ~ x.to!string ~ " are not equal");
 	}
 }
 

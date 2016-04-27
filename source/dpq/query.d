@@ -39,7 +39,7 @@ struct Query
 	{
 		writeln(" * Query");
 
-		c = Connection("dbname=test user=test");
+		c = Connection("host=127.0.0.1 dbname=test user=test");
 
 		writeln("\t * this()");
 		Query q;
@@ -52,7 +52,7 @@ struct Query
 		assert(q._command == cmd, `cmd`);
 		assert(q._params == [], `empty arr`);
 
-		Connection c2 = Connection("dbname=test user=test");
+		Connection c2 = Connection("host=127.0.0.1 dbname=test user=test");
 		writeln("\t * this(Connection, command, params[])");
 		q = Query(c2);
 		assert(q._connection == &c2);
@@ -144,7 +144,7 @@ struct Query
 	{
 		writeln("\t * run");
 
-		auto c = Connection("dbname=test user=test");
+		auto c = Connection("host=127.0.0.1 dbname=test user=test");
 		
 		auto q = Query("SELECT 1::INT");
 

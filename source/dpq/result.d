@@ -60,7 +60,7 @@ struct Result
 		writeln(" * Result");
 		writeln("\t * this(PGresult)");
 
-		c = Connection("dbname=test user=test");
+		c = Connection("host=127.0.0.1 dbname=test user=test");
 
 		auto r = c.execParams("SELECT $1, $2, $3", 1, "two", 123456);
 		assertThrown!DPQException(c.exec("SELECT_BAD_SYNTAX 1, 2, 3"));
@@ -375,24 +375,24 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 	alias RT = Nullable!T;
 	alias AT = TypedefType!TU;
 
-	static if (isSomeString!TU)
+	static if (isSomeString!AT)
 	{
 		string str = cast(string)bytes[0 .. len];
 		return Nullable!string(str);
 	}
-	else static if (is(TU == ubyte[]))
+	else static if (is(AT == ubyte[]))
 		return RT(bytes.dup);
 	else static if (isArray!AT)
 	{
 		auto arr = PGArray(bytes);
 		return RT(cast(AT)arr);
 	}
-	else static if (is(TU == SysTime))
+	else static if (is(AT == SysTime))
 	{
 		SysTime t = SysTime(fromBytes!long(bytes) * 10 + SysTime(POSTGRES_EPOCH).stdTime);
 		return RT(t);
 	}
-	else static if (is(T == struct) || is(T == class))
+	else static if (is(AT == struct) || is(AT == class))
 	{
 		/*
 			 For custom types, the data representation is the following
@@ -426,7 +426,7 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 		foreach (mName; members)
 		{
 			auto member = __traits(getMember, res, mName);
-			alias MT = typeof(member);
+			alias MT = TypedefType!(typeof(member));
 
 			Oid oid = cast(Oid) bytes.read!int;
 			auto length = bytes.read!int;
@@ -437,7 +437,7 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 
 			static if (is(MT == class) || is(MT == struct))
 			{
-				member = fromBytes!(typeof(member))(bytes[0 .. length]);
+				__traits(getMember, res, mName) = fromBytes!MT(bytes[0 .. length]);
 				bytes = bytes[length .. $];
 			}
 			else
@@ -453,21 +453,22 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 							);
 
 				// Make sure member's length matches
-				if (length != member.sizeof)
+				if (length != MT.sizeof)
 					throw new DPQException(
 							"Sizeof member %s (%d) does not match length given by psql (%d)".format(
-								member.stringof,
-								member.sizeof,
+								mName,
+								MT.sizeof,
 								length)
 							);
 
-				member = bytes.read!(typeof(member));
+				__traits(getMember, res, mName) = bytes.read!MT;
 			}
 		}
 		return Nullable!T(res);
 	}
 	else
 	{
+		import std.stdio;
 		TU res = bigEndianToNative!(AT, AT.sizeof)(bytes.to!(ubyte[AT.sizeof]));
 		return RT(res);
 	}
