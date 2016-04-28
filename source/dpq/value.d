@@ -143,11 +143,6 @@ struct Value
 		_valueBytes = val[0 .. len].dup;
 	}
 
-	this(Value val)
-	{
-		opAssign(val);
-	}
-
 	void opAssign(T)(T val)
 			if (isArray!T)
 	{
@@ -164,9 +159,77 @@ struct Value
 		_type = typeOid!T;
 	}
 
+	void opAssign(T)(T val)
+			if(!isArray!T)
+	{
+		if (isAnyNull(val))
+		{
+			_size = 0;
+			_valueBytes = null;
+			_isNull = true;
 
-	private ubyte[] compositeTypeRepresentation(T)(T val)
-		if (is(T == class) || is(T == struct))
+			return;
+		}
+
+		_valueBytes = toBytes(val);
+		_size = _valueBytes.length.to!int;
+		_type = typeOid!T;
+	}
+
+	void opAssign(string val)
+	{
+		import std.string;
+
+		_valueBytes = val.representation.dup;
+		_size = _valueBytes.length.to!int;
+		_type = Type.TEXT;
+	}
+
+	void opAssign(SysTime val)
+	{
+		_type = typeOid!SysTime;
+		_size = typeof(val.stdTime).sizeof;
+
+		_valueBytes = toBytes(val);
+	}
+	
+	void opAssign(Value val)
+	{
+		_valueBytes = val._valueBytes;
+		_size = val._size;
+		_type = val._type;
+	}
+
+	/**
+		Converts the given type to an ubyte[], as PostgreSQL expects it. Ignores
+		any Nullable specifiers and Typedefs.
+	 */
+	Nullable!(ubyte[]) toBytes(T)(T val)
+	{
+		alias NT = NoNullable!T;
+		alias AT = TypedefType!NT;
+
+		if (isAnyNull(val))
+			return Nullable!(ubyte[]).init;
+
+		return Nullable!(ubyte[])(toBytesImpl(cast(AT) val));
+	}
+
+	private ubyte[] toBytesImpl(T)(T val)
+			if (isScalarType!T)
+	{
+		return nativeToBigEndian(val).dup;
+	}
+	
+	private ubyte[] toBytesImpl(T)(T val)
+			if (isSomeString!T)
+	{
+		import std.string : representation;
+		return val.representation.dup;
+	}
+
+	private ubyte[] toBytesImpl(T)(T val)
+			if (is(T == class) || is(T == struct))
 	{
 		alias members = serialisableMembers!T;
 		ubyte[] bytes;
@@ -182,83 +245,38 @@ struct Value
 			auto m = __traits(getMember, val, mName);
 			alias MT = NoNullable!(typeof(m));
 
-			static if (is(MT == class) || is(MT == struct))
-			{
-				auto bs = compositeTypeRepresentation(m);
-				bytes ~= nativeToBigEndian(cast(int) oidForType!MT);
-				//bytes ~= nativeToBigEndian(bs.length.to!int);
-				bytes ~= bs;
-			}
+
+			// Element's OID
+			bytes ~= nativeToBigEndian(cast(int) oidForType!MT);
+
+			auto bs = toBytes(m);
+
+			// Null values have their length written as -1, nothing else is written
+			if (bs.isNull)
+				bytes ~= nativeToBigEndian(cast(int) -1);
 			else
 			{
-				bytes ~= nativeToBigEndian(cast(int) typeOid!MT);
-				bytes ~= nativeToBigEndian(MT.sizeof.to!int);
-				bytes ~= nativeToBigEndian(m);
+				// Element's length in bytes
+				bytes ~= nativeToBigEndian(bs.length.to!int);
+
+				// Actual element data
+				bytes ~= bs;
 			}
 		}
 
 		return bytes;
 	}
 
-	void opAssign(T)(T val)
-			if(!isArray!T && !isInstanceOf!(Nullable, T))
-	{
-		alias AT = TypedefType!T;
-		_size = val.sizeof;
-
-		static if (is(AT == class) || is (AT == struct))
-		{
-			_valueBytes = compositeTypeRepresentation(val);
-			_size = _valueBytes.length.to!int;
-		}
-		else
-			_valueBytes = nativeToBigEndian(val.to!AT).dup;
-
-		_type = typeOid!T;
-	}
-
-	void opAssign(T)(T val)
-		if (isInstanceOf!(Nullable, T))
-	{
-		if (val.isNull)
-		{
-			// NULL values are represented as a single byte with the value of -1
-			_size = 0;
-			_valueBytes = null;
-			_isNull = true;
-		}
-		else
-			opAssign(val.get());
-
-		_type = typeOid!T;
-	}
-
-	void opAssign(string val)
-	{
-		import std.string;
-
-		_valueBytes = val.representation.dup;
-		_size = _valueBytes.length.to!int;
-		_type = Type.TEXT;
-	}
-
-	void opAssign(SysTime val)
+	private ubyte[] toBytesImpl(SysTime val)
 	{
 		import core.time;
 
-		_type = typeOid!SysTime;
 		// stdTime is in hnsecs, psql wants microsecs
 		long diff = val.stdTime - SysTime(POSTGRES_EPOCH).stdTime;
-		_valueBytes = nativeToBigEndian(diff / 10).dup;
-		_size = typeof(val.stdTime).sizeof;
+		return nativeToBigEndian(diff / 10).dup;
 	}
-	
-	void opAssign(Value val)
-	{
-		_valueBytes = val._valueBytes;
-		_size = val._size;
-		_type = val._type;
-	}
+
+
 
 	unittest
 	{
@@ -430,16 +448,16 @@ template typeOid(T)
 Type oidForType(T)()
 		if (!isArray!T)
 {
-	auto oid = typeOid!T;
+	enum oid = typeOid!T;
 
-	if (oid == Type.INFER)
+	static if (oid == Type.INFER)
 	{
 		Oid* p;
 		if ((p = relationName!T in _dpqCustomOIDs) != null)
-			oid = cast(Type) *p;
+			return cast(Type) *p;
 	}
 
-	return cast(Type) oid;
+	return oid;
 }
 
 unittest
