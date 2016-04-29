@@ -1,0 +1,5 @@
+language: d
+addons:
+  apt:
+    packages:
+      - libpq-dev
