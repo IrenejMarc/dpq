@@ -461,7 +461,7 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 								length)
 							);
 
-				__traits(getMember, res, mName) = bytes.read!MT;
+				__traits(getMember, res, mName) = fromBytes!MT(bytes[0 .. length]);
 			}
 		}
 		return Nullable!T(res);

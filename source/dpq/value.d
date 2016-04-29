@@ -369,7 +369,13 @@ struct Value
 		assert(v.as!int == 123);
 
 		v = [[1, 2], [3, 4]];
-		assert(v.as!(int[][]) == [[1, 2],[3, 4]]);
+		assert(v.as!(int[][]) == [[1, 2], [3, 4]]);
+
+		int[2] arr = [1, 2];
+		v = arr;
+
+		assert(v.as!(int[2]) == [1, 2]);
+
 
 		alias MyInt = Typedef!int;
 		MyInt x = 2;
