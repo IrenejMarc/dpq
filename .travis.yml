@@ -1,4 +1,8 @@
 language: d
+services:
+  - postgresql
+before_script:
+  - psql -c 'CREATE USER test; CREATE DATABASE test OWNER test' -U postgres
 addons:
   apt:
     packages:
