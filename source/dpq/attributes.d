@@ -485,13 +485,3 @@ template isNonStaticMember(T, string M)
 		enum isNonStaticMember = !__traits(compiles, (){ auto x = __traits(getMember, T, M); }());
 	}
 }
-
-bool isAnyNull(T)(T val)
-{
-	static if (is(T == class))
-		return val is null;
-	else static if (isInstanceOf!(Nullable, T))
-		return val.isNull;
-	else
-		return false;
-}

@@ -198,8 +198,24 @@ template NoNullable(T)
 		alias NoNullable = T;
 }
 
+/**
+	Will strip off any Nullable, Typedefs and qualifiers from a given type
 
-deprecated("we don't do recursing anymore")
+	Examples:
+		static assert(RealType!(const Nullable!(immutable int) == int);
+ */
+template RealType(T)
+{
+	import std.typecons : TypedefType;
+	// Ugly, but better than doing this every time we need it
+	alias NT = Unqual!(NoNullable!(TypedefType!T));
+
+	static if (is(T == NT))
+		alias RealType = NT;
+	else
+		alias RealType = RealType!NT;
+}
+
 template ShouldRecurse(alias TA)
 {
 	alias T = NoNullable!(typeof(TA));

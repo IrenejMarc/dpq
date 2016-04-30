@@ -11,6 +11,7 @@ import dpq.querybuilder;
 import dpq.meta;
 import dpq.prepared;
 import dpq.smartptr;
+import dpq.serialisation : isAnyNull;
 
 import std.string;
 //import derelict.pq.pq;

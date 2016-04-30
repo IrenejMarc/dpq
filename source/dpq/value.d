@@ -2,10 +2,10 @@ module dpq.value;
 
 import dpq.result;
 import dpq.exception;
-import dpq.pgarray;
 import dpq.meta;
 import dpq.attributes;
 import dpq.connection;
+import dpq.serialisation;
 
 //import derelict.pq.pq;
 import libpq.libpq;
@@ -20,7 +20,6 @@ import std.datetime : SysTime, DateTime;
 
 version(unittest) import std.stdio;
 
-enum POSTGRES_EPOCH = DateTime(2000, 1, 1);
 
 package enum Type : Oid
 {
@@ -152,7 +151,7 @@ struct Value
 			_valueBytes = val;
 		else
 		{
-			_valueBytes = PGArray(val).toBytes();
+			_valueBytes = toBytes(val);
 			_size = _valueBytes.length.to!int;
 		}
 
@@ -200,128 +199,6 @@ struct Value
 		_type = val._type;
 	}
 
-	/**
-		Converts the given type to an ubyte[], as PostgreSQL expects it. Ignores
-		any Nullable specifiers and Typedefs.
-	 */
-	Nullable!(ubyte[]) toBytes(T)(T val)
-	{
-		alias NT = NoNullable!T;
-		alias AT = TypedefType!NT;
-
-		if (isAnyNull(val))
-			return Nullable!(ubyte[]).init;
-
-		return Nullable!(ubyte[])(toBytesImpl(cast(AT) val));
-	}
-
-	private ubyte[] toBytesImpl(T)(T val)
-			if (isScalarType!T)
-	{
-		return nativeToBigEndian(val).dup;
-	}
-	
-	private ubyte[] toBytesImpl(T)(T val)
-			if (isSomeString!T)
-	{
-		import std.string : representation;
-		return val.representation.dup;
-	}
-
-	private ubyte[] toBytesImpl(T)(T val)
-			if (is(T == class) || is(T == struct))
-	{
-		alias members = serialisableMembers!T;
-		ubyte[] bytes;
-
-		size_t index = 0;
-		if (isAnyNull(val))
-			return nativeToBigEndian(cast(int) -1).dup;
-		else	
-			bytes ~= nativeToBigEndian(cast(int) members.length);
-
-		foreach (mName; members)
-		{
-			auto m = __traits(getMember, val, mName);
-			alias MT = NoNullable!(typeof(m));
-
-
-			// Element's OID
-			bytes ~= nativeToBigEndian(cast(int) oidForType!MT);
-
-			auto bs = toBytes(m);
-
-			// Null values have their length written as -1, nothing else is written
-			if (bs.isNull)
-				bytes ~= nativeToBigEndian(cast(int) -1);
-			else
-			{
-				// Element's length in bytes
-				bytes ~= nativeToBigEndian(bs.length.to!int);
-
-				// Actual element data
-				bytes ~= bs;
-			}
-		}
-
-		return bytes;
-	}
-
-	private ubyte[] toBytesImpl(SysTime val)
-	{
-		import core.time;
-
-		// stdTime is in hnsecs, psql wants microsecs
-		long diff = val.stdTime - SysTime(POSTGRES_EPOCH).stdTime;
-		return nativeToBigEndian(diff / 10).dup;
-	}
-
-
-
-	unittest
-	{
-		import std.string;
-
-		writeln(" * value");
-		writeln("\t * opAssign");
-
-		int a = 0xFFFF_FFFF;
-		Value v;
-		v.opAssign(a);
-
-		assert(v._size == 4);
-		assert(v._valueBytes == [255, 255, 255, 255]);
-		assert(v._type == Type.INT4);
-		
-		int[][] b = [[1], [2]];
-		auto pga = PGArray(b);
-
-		v.opAssign(b);
-		assert(v._size == pga.toBytes().length);
-		assert(v._valueBytes == pga.toBytes());
-
-		string str = "some string, I don't even know.";
-		v.opAssign(str);
-
-		assert(v._valueBytes == str.representation);
-		assert(v.size == str.representation.length);
-
-		Value v2;
-		v.opAssign(v2);
-		assert(v2 == v);
-
-		import std.datetime;
-		SysTime t = Clock.currTime;
-		v2 = t;
-
-		assert(v2.as!SysTime == t);
-
-		Nullable!int ni;
-		assert(Value(ni).as!int.isNull);
-		ni = 5;
-		assert(Value(ni).as!int == ni);
-	}
-
 	@property int size()
 	{
 		return _size;
@@ -352,7 +229,7 @@ struct Value
 		if (_isNull)
 			return Nullable!RT.init;
 
-		const(ubyte)[] data = _valueBytes[0 .. _size];
+		ubyte[] data = _valueBytes[0 .. _size];
 		return fromBytes!RT(data, _size);
 	}
 
@@ -380,102 +257,10 @@ struct Value
 		alias MyInt = Typedef!int;
 		MyInt x = 2;
 		v = Value(x);
-		writefln("Val is %s", v);
 		assert(v.as!MyInt == x, v.as!(MyInt).to!string ~ " and " ~ x.to!string ~ " are not equal");
 	}
 }
 
-template typeOid(T)
-{
-		alias TU = std.typecons.Unqual!T;
-		static if (isArray!T && !isSomeString!T)
-		{
-			alias BT = BaseType!T;
-			static if (is(BT == int))
-				enum typeOid = Type.INT4ARRAY;
-			else static if (is(BT == long))
-				enum typeOid = Type.INT8ARRAY;
-			else static if (is(BT == short))
-				enum typeOid = Type.INT2ARRAY;
-			else static if (is(BT == float))
-				enum typeOid = Type.FLOAT4ARRAY;
-			else static if (is(BT == byte) || is (BT == ubyte))
-				enum typeOid = Type.BYTEA;
-			else
-				static assert(false, "Cannot map array type " ~ T.stringof ~ " to Oid");
-		}
-		else
-		{
-			static if (is(TU == int))
-				enum typeOid = Type.INT4;
-			else static if (is(TU == long))
-				enum typeOid = Type.INT8;
-			else static if (is(TU == bool))
-				enum typeOid = Type.BOOL;
-			else static if (is(TU == byte))
-				enum typeOid = Type.CHAR;
-			else static if (is(TU == char))
-				enum typeOid = Type.CHAR;
-			else static if (isSomeString!TU)
-				enum typeOid = Type.TEXT;
-			else static if (is(TU == short))
-				enum typeOid = Type.INT2;
-			else static if (is(TU == float))
-				enum typeOid = Type.FLOAT4;
-			else static if (is(TU == double))
-				enum typeOid = Type.FLOAT8;
-			else static if (is(TU == SysTime))
-				enum typeOid = Type.TIMESTAMP;
-
-			/**
-				Since unsigned types are not supported by PostgreSQL, we use signed
-				types for them. Transfer and representation in D will still work correctly,
-				but SELECTing them in the psql console, or as a string might result in 
-				a negative number.
-
-				It is recommended not to use unsigned types in structures, that will
-				be used in the DB directly.
-			*/
-			else static if (is(TU == ulong))
-				enum typeOid = Type.INT8;
-			else static if (is(TU == uint))
-				enum typeOid = Type.INT4;
-			else static if (is(TU == ushort) || is(TU == char))
-				enum typeOid = Type.INT2;
-			else static if (is(TU == ubyte))
-				enum typeOid = Type.CHAR;
-			else
-				// Try to infer
-				enum typeOid = Type.INFER;
-		}
-}
-
-// TODO: this for arrays
-Type oidForType(T)()
-		if (!isArray!T)
-{
-	enum oid = typeOid!T;
-
-	static if (oid == Type.INFER)
-	{
-		Oid* p;
-		if ((p = relationName!T in _dpqCustomOIDs) != null)
-			return cast(Type) *p;
-	}
-
-	return oid;
-}
-
-unittest
-{
-	writeln("\t * typeOid");
-
-	static assert(typeOid!int == Type.INT4, "int");
-	static assert(typeOid!string == Type.TEXT, "string");
-	static assert(typeOid!(int[]) == Type.INT4ARRAY, "int[]");
-	static assert(typeOid!(int[][]) == Type.INT4ARRAY, "int[][]");
-	static assert(typeOid!(ubyte[]) == Type.BYTEA, "ubyte[]");
-}
 
 Oid[] paramTypes(Value[] values)
 {
