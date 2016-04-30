@@ -1,4 +1,3 @@
-
 module libpq.libpq;
 
 import core.stdc.stdio;
@@ -6,6 +5,7 @@ import core.stdc.stdio;
 extern (C):
 nothrow:
 @nogc:
+
 //pg_config_ext.h
 alias PG_INT64_TYPE = long;
 
@@ -51,6 +51,7 @@ enum
     CONNECTION_NEEDED = 8
 }
 
+// TODO: fix aliases to alias X = Y style
 alias int ConnStatusType;
 
 enum 
