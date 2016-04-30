@@ -1,32 +1,30 @@
 # dpq - A D PostgreSQL library
+[![Build Status](https://travis-ci.org/IrenejMarc/dpq.svg?branch=master)](https://travis-ci.org/IrenejMarc/dpq)
 
 dpq wraps the libpq library and aims to provide a simple and modern way to access PostgreSQL in the D programming language.
 
-## Current features:
- - Opening a connection using a connection string
- - Queries
- - Fetching the results of queries in binary format
- - Looping through the said results
- - Exceptions on query errors
- - Automatic (de-)serialisation of structs/classes
- - Automatic schema creation from struct/classes (includes PKs, FKs, indexes)
- - Reading and writing to array fields (up to 6-dimensions, limited by PostgreSQL)
- - Basic asynchronous query support with Query.runAsync()
- - Prepared statements
- - Support for SysTime type, saving time in the DB in UTC.
-  
-## Planned features
- - Connection pooling (maybe)
- - Date/Time types support
- - Extensive documentantion
+## Feature highlights:
+ - Manual querying using `Query` or `Connection`'s `exec` and `execParams`
+ - Automatic schema generation from D structures (including PKs, indexes, ... check example below)
+ - ORM functions `findOne`, `findBy`, `insert`, `update`, `count`, ... on `Connection`
+ - Full support for `Nullable` and `Typedef` types.
+ - `foreach` looping through `Result` and `Row`
+ - Data is sent *fully* in binary, including structures and arrays (and arrays of structures)
+ - Ability to specify a custom serialiser for any custom type
+ - Pre-existing serialisers cover most needs, and `SysTime`
+ - (Basic) async query support (will be improved in the future)
+ - (Basic) prepared statement support (will be improved in the future)
+
  
 ## Documentation
-Documentation is in the code itself, though not complete
+Documentation is in the code itself, though pretty lacking currently.
+
+Unit tests might provide some useful usage examples too.
  
 ## Some notes:
- - If a wrong type is specified while fetching a column, the results are undefined. Most likely just garbage
+ - If a wrong type is specified to `Value`'s `as`, the results are undefined, but most likely a `RangeError` or garbage.
  - Using QueryBuilder, when specifying columns, make sure they are not reserverd SQL keywords, they will not be escaped automatically (wrap keywords in `" "`)
- - Be careful with using Connection's exec function, since it only returns textual values, that are not currently supported by dpq's value. (execParams can be used even without params and will return binary data)
+ - Be careful with using `Connection`'s `exec` function, since it only returns textual values, that are not currently supported by dpq's `Value`. (execParams can be used even without params and will return binary data)
 
 ## Licence
 MIT, read LICENSE.txt
@@ -34,6 +32,7 @@ MIT, read LICENSE.txt
 ## Example
 
 ```d
+// Note: example should probably be updated
 import std.stdio;
 import dpq.connection;
 import dpq.query;
@@ -160,4 +159,3 @@ void main()
 }
 
 ```
-
