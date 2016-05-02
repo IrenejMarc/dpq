@@ -11,7 +11,11 @@ import dpq.querybuilder;
 import dpq.meta;
 import dpq.prepared;
 import dpq.smartptr;
-import dpq.serialisation : isAnyNull;
+import dpq.serialisation;
+
+import dpq.serialisers.array;
+import dpq.serialisers.composite;
+
 
 import std.string;
 //import derelict.pq.pq;
@@ -338,7 +342,100 @@ struct Connection
 		return str;
 	}
 
+
+	/**
+		Will create the relation and return the queries (foreign key and index creation)
+		that still need to be ran, usually after ALL the relations are created.
+	 */
+	private string[] createRelation(T)()
+	{
+		alias members = serialisableMembers!T;
+
+		string relName = SerialiserFor!T.nameForType!T;
+		string escRelName = escapeIdentifier(relName);
+
+		// A list of columns in the table
+		string[] columns;
+		// Queries that must be ran after the table is created
+		string[] additionalQueries;
+
+		foreach (mName; members)
+		{
+			// Is there a better way to do this?
+			enum member = "T." ~ mName;
+			alias MType = RealType!(typeof(mixin(member)));
+			alias serialiser = SerialiserFor!MType;
+
+			// The attribute's name
+			string attrName = attributeName!(mixin(member));
+			string escAttrName = escapeIdentifier(attrName);
+
+			// And the type, the user-specified type overwrites anything else
+			static if (hasUDA!(mixin(member), PGTypeAttribute))
+				string attrType = getUDAs!(mixin(member), PGTypeAttribute)[0].type;
+			else
+				string attrType = serialiser.nameForType!MType;
+
+			string attr = escAttrName ~ " " ~ attrType;
+
+			// A type must be created before using it.
+			// This could be implemented using serialisers ...
+			serialiser.ensureExistence!MType(this);
+
+			static if (hasUDA!(mixin(member), PrimaryKeyAttribute))
+				attr ~= " PRIMARY KEY";
+			else static if (hasUDA!(mixin(member), ForeignKeyAttribute))
+			{
+				enum uda = getUDAs!(mixin(member), ForeignKeyAttribute)[0];
+
+				// Create the FK
+				additionalQueries ~= 
+					`ALTER TABLE %s ADD CONSTRAINT "%s" FOREIGN KEY(%s) REFERENCES %s (%s)`.format(
+							escRelName,
+							escapeIdentifier("%s_%s_fk_%s".format(relName, attrName, uda.relation)),
+							escAttrName,
+							escapeIdentifier(uda.relation),
+							escapeIdentifier(uda.pkey));
+
+				// Also create an index on the foreign key
+				additionalQueries ~= "CREATE INDEX %s ON %s (%s)".format(
+						escapeIdentifier("%s_%s_fk_index".format(relName, attrName)),
+						escRelName,
+						escAttr);
+			}
+			else static if (hasUDA!(mixin(member), IndexAttribute))
+			{
+				enum uda = getUDAs!(mixin(member), IndexAttribute)[0];
+
+				additionalQueries ~= "CREATE%sINDEX %s ON %s (%s)".format(
+						uda.unique ? " UNIQUE " : "", 
+						escapeIdentifier("%s_%s_fk_index".format(relName, attrName)),
+						escRelName,
+						escAttrName);
+			}
+
+			columns ~= attr;
+		}
+
+		// Create the table
+		exec("CREATE TABLE IF NOT EXISTS %s (%s)".format(escRelName, columns.join(", ")));
+
+		addOidsFor(relName);
+
+		return additionalQueries;
 	}
+
+
+	void addOidsFor(string typeName)
+	{
+		auto r = execParams("SELECT $1::regtype::oid, $2::regtype::oid", typeName, typeName ~ "[]");
+		Oid typeOid = r[0][0].as!int;
+		Oid arrOid = r[0][1].as!int;
+
+		CompositeTypeSerialiser.addCustomOid(typeName, typeOid);
+		ArraySerialiser.addCustomOid(typeOid, arrOid);
+	}
+
 
 	/**
 		Generates and runs the DDL from the given structures
@@ -367,123 +464,12 @@ struct Connection
 	{
 		import std.stdio;
 		string[] additional;
-		string[] relations;
 
-		foreach (type; T)
-		{
-			enum name = relationName!(type);
-			relations ~= name;
+		foreach (Type; T)
+			additional ~= createRelation!Type;
 
-			string str;
-			if (createType)
-				str = "CREATE TYPE \"" ~ name ~ "\" AS (%s)";
-			else
-				str = "CREATE TABLE IF NOT EXISTS \"" ~ name ~ "\" (%s)";
-
-			string cols;
-			foreach(m; serialisableMembers!type)
-			{
-				string colName = attributeName!(mixin("type." ~ m));
-				cols ~= "\"" ~ colName ~ "\"";
-
-				// HACK: typeof a @property seems to be failing hard
-				static if (is(FunctionTypeOf!(mixin("type." ~ m)) == function))
-					alias t = typeof(mixin("type()." ~ m));
-				else
-					alias t = typeof(mixin("type." ~ m));
-
-				cols ~= " ";
-
-				// Basic data types
-				static if (hasUDA!(mixin("type." ~ m), PGTypeAttribute))
-					cols ~= getUDAs!(mixin("type." ~ m), PGTypeAttribute)[0].type;
-				else
-				{
-					alias tu = Unqual!t;
-					static if (ShouldRecurse!(mixin("type." ~ m)))
-					{
-						ensureSchema!(NoNullable!tu)(true);
-						cols ~= '"' ~ relationName!(NoNullable!tu) ~ '"';
-					}
-					else
-						cols ~= SQLType!tu;
-				}
-				
-				// Primary key
-				static if (hasUDA!(mixin("type." ~ m), PrimaryKeyAttribute))
-				{
-					if (!createType)
-						cols ~= " PRIMARY KEY";
-				}
-				// Index
-				else static if (hasUDA!(mixin("type." ~ m), IndexAttribute))
-				{
-					enum uda = getUDAs!(mixin("type." ~ m), IndexAttribute)[0];
-					additional ~= "CREATE%sINDEX \"%s\" ON \"%s\" (\"%s\")".format(
-							uda.unique ? " UNIQUE " : " ",
-							"%s_%s_index".format(name, colName),
-							name,
-							colName);
-
-					// DEBUG
-				}
-				// Foreign key
-				else static if (hasUDA!(mixin("type." ~ m), ForeignKeyAttribute))
-				{
-					enum uda = getUDAs!(mixin("type." ~ m), ForeignKeyAttribute)[0];
-					additional ~= 
-						"ALTER TABLE \"%s\" ADD CONSTRAINT \"%s\" FOREIGN KEY (\"%s\") REFERENCES \"%s\" (\"%s\")".format(
-								name,
-								"%s_%s_fk_%s".format(name, colName, uda.relation),
-								colName,
-								uda.relation,
-								uda.pkey);
-
-					// Create an index on the FK too
-					additional ~= "CREATE INDEX \"%s\" ON \"%s\" (\"%s\")".format(
-							"%s_%s_fk_index".format(name, colName),
-							name,
-							colName);
-
-				}
-
-				cols ~= ", ";
-			}
-
-			cols = cols[0 .. $ - 2];
-			str = str.format(cols);
-			if (createType)
-			{
-				try
-				{
-					exec(str);
-				}
-				catch {} // Do nothing, type already exists
-			}
-			else
-				exec(str);
-		}
 		foreach (cmd; additional)
-		{
-			try
-			{
-				exec(cmd);
-			}
-			catch {} // Horrible, I know, but this just means the constraint/index already exists
-		}
-
-		// After we're done creating all the types, a good idea would be to get OIDs for all of them
-		if (relations.length > 0)
-		{
-			auto res = execParams(
-					"SELECT typname, oid FROM pg_type WHERE typname IN ('%s')".format(
-						relations.join("','")));
-
-			foreach (r; res)
-				_dpqCustomOIDs[r[0].as!string] = r[1].as!Oid;
-		}
-
-		
+			try { exec(cmd); } catch {} // Horrible, I know, but this just means the constraint/index already exists
 	}
 
 	unittest
@@ -1342,7 +1328,4 @@ T deserialise(T)(Row r, string prefix = "")
 
 /// Hold the last created connection, not to be used outside the library
 package Connection* _dpqLastConnection;
-
-/// Holds a list of all the OIDs of our custom types, indexed by their relationName
-package Oid[string] _dpqCustomOIDs;
 
