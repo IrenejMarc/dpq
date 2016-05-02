@@ -5,8 +5,9 @@ import dpq.meta;
 import dpq.attributes;
 import dpq.exception;
 import dpq.value;
+import dpq.connection;
 
-import std.string : format;
+import std.string : format, join;
 import std.typecons : Nullable, Typedef;
 import std.traits;
 import std.array : Appender;
@@ -27,7 +28,7 @@ import libpq.libpq;
 		- value
 
 	Example: (bytes, decimal)
-		[0 0 0 2 | 0 0 0 23 | 0 0 0 4 | 0 0 0 1 | 0 0 0 23 | 0 0 0 4 | 0 0 0 2]
+		[0 0 0 2 , 0 0 0 23 , 0 0 0 4 , 0 0 0 1 , 0 0 0 23 , 0 0 0 4 , 0 0 0 2]
 		will represent a struct with two members, both OID 23, length 4, with values 1 and 2
  */
 struct CompositeTypeSerialiser
@@ -44,11 +45,16 @@ struct CompositeTypeSerialiser
 			!isInstanceOf!(Typedef, T);
 	}
 
-	static Nullable!(ubyte[]) serialise(T)(T val)
+	static void enforceSupportedType(T)()
 	{
 		static assert (
 				isSupportedType!T,
 				"'%s' is not supported by CompositeTypeSerialiser".format(T.stringof));
+	}
+
+	static Nullable!(ubyte[]) serialise(T)(T val)
+	{
+		enforceSupportedType!T;
 
 		alias RT = Nullable!(ubyte[]);
 
@@ -68,7 +74,7 @@ struct CompositeTypeSerialiser
 			alias MT = RealType!(typeof(member));
 
 			// Element's Oid
-			data ~= nativeToBigEndian(cast(int) oidForType!MT);
+			data ~= nativeToBigEndian(cast(int) SerialiserFor!MT.oidForType!MT);
 
 			auto bytes = toBytes(member);
 
@@ -88,9 +94,7 @@ struct CompositeTypeSerialiser
 
 	static T deserialise(T)(const (ubyte)[] bytes)
 	{
-		static assert (
-				isSupportedType!T,
-				"'%s' is not supported by CompositeTypeSerialiser".format(T.stringof));
+		enforceSupportedType!T;
 
 		alias members = serialisableMembers!T;
 
@@ -125,8 +129,70 @@ struct CompositeTypeSerialiser
 
 		return result;
 	}
+
+	static void ensureExistence(T)(Connection conn)
+	{
+		alias members = serialisableMembers!T;
+
+		string typeName = SerialiserFor!T.nameForType!T;
+		string escTypeName = conn.escapeIdentifier(typeName);
+
+		string[] columns;
+
+		foreach (mName; members)
+		{
+			enum member = "T." ~ mName;
+
+			alias MType = RealType!(typeof(mixin(member)));
+			alias serialiser = SerialiserFor!MType;
+			serialiser.ensureExistence!MType(conn);
+
+			string attrName = attributeName!(mixin(member));
+			string escAttrName = conn.escapeIdentifier(attrName);
+
+			static if (hasUDA!(mixin(member), PGTypeAttribute))
+				string attrType = getUDAs!(mixin(member), PGTypeAttribute)[0].type;
+			else
+				string attrType = serialiser.nameForType!MType;
+
+			columns ~= escAttrName ~ " " ~ attrType;
+		}
+
+		try 
+		{
+			conn.exec("CREATE TYPE %s AS (%s)".format(escTypeName, columns.join(", ")));
+		} catch (DPQException e) {} // Horrible, but just means the type already exists
+
+		conn.addOidsFor(typeName);
+	}
+
+	static string nameForType(T)()
+	{
+		enforceSupportedType!T;
+
+		return relationName!(RealType!T);
+	}
+
+	private static Oid[string] _customOids;
+	static Oid oidForType(T)()
+	{
+		enforceSupportedType!T;
+		
+		auto oid = nameForType!T in _customOids;
+		assert(
+				oid != null,
+				"Oid for type %s not found. Did you run ensureSchema?".format(T.stringof));
+
+		return *oid;
+	}
+
+	static void addCustomOid(string typeName, Oid oid)
+	{
+		_customOids[typeName] = oid;
+	}
 }
 
+// Very basic tests
 unittest
 {
 	import std.stdio;
@@ -143,14 +209,17 @@ unittest
 		int a = 1;
 		int b = 2;
 
+		// test nullable too
 		Nullable!Test2 ntest2;
 		Test2 test2;
 	}
 
+	// An OID must exist for types being serialised
+	CompositeTypeSerialiser.addCustomOid("test2", 999999);
+
 	Test t = Test(1, 2);
 	auto serialised = CompositeTypeSerialiser.serialise(t);
 	auto deserialised = CompositeTypeSerialiser.deserialise!Test(serialised);
-
 
 	// Why is this throwing AssertError???
 	//assert(t == deserialised);

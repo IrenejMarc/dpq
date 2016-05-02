@@ -6,6 +6,9 @@ import std.bitmanip;
 import core.time;
 import dpq.meta;
 import dpq.serialisation;
+import dpq.connection : Connection;
+import libpq.libpq : Oid;
+import dpq.value : Type;
 
 enum POSTGRES_EPOCH = DateTime(2000, 1, 1);
 
@@ -38,6 +41,37 @@ struct SysTimeSerialiser
 				isSupportedType!T,
 				"'%s' is not supported by SysTimeSerialiser".format(T.stringof));
 
-		return SysTime(fromBytes!long(bytes) * 10 + SysTime(POSTGRES_EPOCH).stdTime);
+		return SysTime(fromBytes!long(bytes, long.sizeof) * 10 + SysTime(POSTGRES_EPOCH).stdTime);
 	}
+
+	static Oid oidForType(T)()
+	{
+		return Type.TIMESTAMP;
+	}
+
+	static string nameForType(T)()
+	{
+		return "TIMESTAMP";
+	}
+
+	static void ensureExistence(T)(Connection c) 
+	{
+		return;
+	}
+}
+
+unittest
+{
+	import std.stdio;
+	import std.datetime;
+
+	writeln(" * SysTimeSerialiser");
+
+	// In reality, we should probably only check up to msec accuracy,
+	// and I'm not sure how much SysTimes == checks.
+	SysTime time = Clock.currTime;
+	auto serialised = SysTimeSerialiser.serialise(time);
+
+	writefln("Serialised: %s", serialised);
+	assert(SysTimeSerialiser.deserialise!SysTime(serialised) == time);
 }

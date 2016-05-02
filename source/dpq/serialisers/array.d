@@ -4,12 +4,16 @@ import std.typecons : Nullable;
 import std.bitmanip;
 import std.traits;
 import std.conv : to;
+import std.string : format;
 
 import dpq.meta;
 import dpq.serialisation;
 import dpq.exception;
+import dpq.value : Type;
+import dpq.connection : Connection;
 
 import libpq.libpq;
+
 
 
 
@@ -55,14 +59,25 @@ struct ArraySerialiser
 {
 	static bool isSupportedType(T)()
 	{
-		return isArray!T;
+		// BYTEA uses its own serialiser
+		// strings are arrays, but not handled by this serialiser
+		return 
+			isArray!T &&
+			!isSomeString!T &&
+			!is(T == ubyte[]) &&
+			!is(T == byte[]);
 	}
 
-	static Nullable!(ubyte[]) serialise(T)(T val)
+	static void enforceSupportedType(T)()
 	{
 		static assert (
 				isSupportedType!T,
 				"'%s' is not supported by ArraySerialiser".format(T.stringof));
+	}
+
+	static Nullable!(ubyte[]) serialise(T)(T val)
+	{
+		enforceSupportedType!T;
 
 		alias RT = Nullable!(ubyte[]);
 		ubyte[] result;
@@ -75,7 +90,8 @@ struct ArraySerialiser
 		result ~= nativeToBigEndian(cast(int) 0);
 
 		// OID of the array elements
-		result ~= nativeToBigEndian(cast(int) oidForType!(RealType!(BaseType!(T))));
+		alias BT = BaseType!T;
+		result ~= nativeToBigEndian(cast(int) SerialiserFor!BT.oidForType!BT);
 
 		// Dimension size for every dimension
 		int[] dimSizes;
@@ -88,7 +104,7 @@ struct ArraySerialiser
 				throw new DPQException("Multidimensional arrays must have sub-arrays with matching dimensions.");
 
 			// Loop through array
-			static if (isArray!(RealType!(ForeachType!T)))
+			static if (isSupportedType!(RealType!(ForeachType!T)))
 			{
 				foreach (v; data)
 				{
@@ -112,7 +128,7 @@ struct ArraySerialiser
 		// Writes all the values, left-to-right to data
 		void write(T)(T data)
 		{
-			static if (isArray!(RealType!(ForeachType!T)))
+			static if (isSupportedType!(RealType!(ForeachType!T)))
 				foreach (v; data)
 					write(v);
 			else
@@ -138,15 +154,12 @@ struct ArraySerialiser
 
 	static T deserialise(T)(const(ubyte)[] bytes)
 	{
-		static assert (
-				isSupportedType!T,
-				"'%s' is not supported by ArraySerialiser".format(T.stringof));
+		enforceSupportedType!T;
 
 		// Basic array info
 		int nDims = bytes.read!int;
 		int offset = bytes.read!int;
 		Oid oid = bytes.read!int;
-
 
 		int[] dimSizes;
 		int[] lowerBounds;
@@ -172,7 +185,7 @@ struct ArraySerialiser
 			alias FT = RealType!(ForeachType!TI);
 
 			// Recurse into the next dimension
-			static if (isArray!FT)
+			static if (isSupportedType!FT)
 			{
 				static if (isDynamicArray!TI)
 					arr.length = dimSizes[dim];
@@ -190,32 +203,78 @@ struct ArraySerialiser
 			else
 			{
 				TI inner;
-				static if (isDynamicArray!T)
+				static if (isDynamicArray!TI)
 					inner.length = dimSizes[dim];
 
 				// For each of the elements, read its size, then their actual value
 				foreach (i; 0 .. dimSizes[dim])
 				{
 					int len = bytes.read!int;
+
 					// We're using "global" offset here, because we're reading the array left-to-right
 					inner[i] = fromBytes!FT(bytes[0 .. len], len);
 
 					// "Consume" the array
 					bytes = bytes[len .. $];
 				}
-				return inner;
+				return cast(TI) inner;
 			}
 		}
 
 		return assemble!T;
+	}
+
+	static Oid oidForType(T)()
+	{
+		enforceSupportedType!T;
+
+		alias BT = RealType!(BaseType!T);
+
+		Oid typeOid = SerialiserFor!BT.oidForType!BT;
+
+		Oid* p = typeOid in arrayOIDs;
+		assert(p != null, "Oid for type %s cannot be determined by ArraySerialiser".format(T.stringof));
+
+		return *p;
+	}
+
+	static string nameForType(T)()
+	{
+		enforceSupportedType!T;
+
+		alias FT = RealType!(ForeachType!T);
+		alias serialiser = SerialiserFor!FT;
+		return serialiser.nameForType!FT ~ "[]";
+	}
+
+	// Arrays are always created implicitly
+	static void ensureExistence(T)(Connection c)
+	{
+		return;
+	}
+
+	static void addCustomOid(Oid typeOid, Oid oid)
+	{
+		arrayOIDs[typeOid] = oid;
+	}
+
+	template ArrayDimensions(T)
+	{
+		static if (isSupportedType!T)
+			enum ArrayDimensions = 1 + ArrayDimensions!(ForeachType!T);
+		else 
+			enum ArrayDimensions = 0;
 	}
 }
 
 unittest
 {
 	import std.stdio;
+	import dpq.serialisers.composite;
+
 	writeln(" * ArraySerialiser");
 
+	writeln("	* Array of scalar types");
 	int[2][2] arr = [[1, 2], [3, 4]];
 	ubyte[] expected = [
 		0, 0, 0, 2, // dims
@@ -244,4 +303,71 @@ unittest
 	auto serialised = ArraySerialiser.serialise(arr);
 	assert(serialised == expected);
 	assert(ArraySerialiser.deserialise!(int[2][2])(serialised) == arr);
+
+
+	writeln("	* Empty array");
+
+	int[] emptyScalarArr;
+	serialised = ArraySerialiser.serialise(emptyScalarArr);
+	assert(ArraySerialiser.deserialise!(int[])(serialised) == emptyScalarArr);
+
+
+	writeln("	* Array of struct");
+	struct Test
+	{
+		int a = 1;
+	}
+
+	// An oid needs to exist for struct serialisation
+	CompositeTypeSerialiser.addCustomOid(
+			CompositeTypeSerialiser.nameForType!Test,
+			999999);
+
+	Test[] testArr = [Test(1), Test(2)];
+	serialised = ArraySerialiser.serialise(testArr);
+	assert(ArraySerialiser.deserialise!(Test[])(serialised) == testArr);
+
+	writeln("	* Array of arrays");
+	int[][] twoDArray = [
+		[1, 2, 3],
+		[4, 5, 6],
+		[7, 8, 9]
+	];
+
+	serialised = ArraySerialiser.serialise(twoDArray);
+	assert(ArraySerialiser.deserialise!(int[][])(serialised) == twoDArray);
+
+	import std.datetime;
+
+	writeln("	* Array of SysTime");
+	SysTime[] timeArr;
+	timeArr ~= Clock.currTime;
+	timeArr ~= Clock.currTime + 2.hours;
+	timeArr ~= Clock.currTime + 24.hours;
+
+	serialised = ArraySerialiser.serialise(timeArr);
+	assert(ArraySerialiser.deserialise!(SysTime[])(serialised) == timeArr);
+
+	writeln("	* Array of string");
+	string[] stringArr = [
+		"My first string.",
+		"String numero dva",
+		"Do I even need this many strings?",
+		"Bye"
+	];
+
+	serialised = ArraySerialiser.serialise(stringArr);
+	assert(ArraySerialiser.deserialise!(string[])(serialised) == stringArr);
+}
+
+// Element Oid => Array Oid map
+private Oid[Oid] arrayOIDs;
+
+static this()
+{
+	// Initialise arrayOIDs with the default values
+	arrayOIDs[Type.INT4]   = Type.INT4ARRAY;
+	arrayOIDs[Type.INT8]   = Type.INT8ARRAY;
+	arrayOIDs[Type.INT2]   = Type.INT2ARRAY;
+	arrayOIDs[Type.FLOAT4] = Type.FLOAT4ARRAY;
 }
