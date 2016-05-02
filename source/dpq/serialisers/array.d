@@ -346,7 +346,12 @@ unittest
 	timeArr ~= Clock.currTime + 24.hours;
 
 	serialised = ArraySerialiser.serialise(timeArr);
-	assert(ArraySerialiser.deserialise!(SysTime[])(serialised) == timeArr);
+	foreach (i, time; ArraySerialiser.deserialise!(SysTime[])(serialised))
+	{
+		// Serialiser only works with ms accuracy, so comparing them directly 
+		// won't work in most cases.
+		assert(time.toUnixTime == timeArr[i].toUnixTime);
+	}
 
 	writeln("	* Array of string");
 	string[] stringArr = [
