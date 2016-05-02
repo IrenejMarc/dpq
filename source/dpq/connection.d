@@ -310,6 +310,33 @@ struct Connection
 		catch {}
 
 		assert(c.errorMessage.length != 0);
+	}
+
+	string escapeLiteral(string str)
+	{
+		const(char)* cStr = str.toStringz;
+		auto esc = PQescapeLiteral(_connection, cStr, str.length);
+
+		if (esc == null)
+			throw new DPQException("escapeLiteral failed: " ~ this.errorMessage);
+
+		str = esc.fromStringz.dup; // make a copy, escaped data must be freed
+		PQfreemem(esc);
+		return str;
+	}
+
+	string escapeIdentifier(string str)
+	{
+		const(char)* cStr = str.toStringz;
+		auto esc = PQescapeIdentifier(_connection, cStr, str.length);
+
+		if (esc == null)
+			throw new DPQException("escapeIdentifier failed: " ~ this.errorMessage);
+
+		str = esc.fromStringz.dup; // make a copy, escaped data must be freed
+		PQfreemem(esc);
+		return str;
+	}
 
 	}
 
