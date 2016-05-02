@@ -1,3 +1,9 @@
+/**
+	Kinda hacked-together and not really complete prepared-statement thing.
+	Needs a lot of work, as well as tests.
+	
+	Accepting donations in tests.
+ */
 module dpq.prepared;
 
 //import derelict.pq.pq;
