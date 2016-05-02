@@ -169,6 +169,7 @@ unittest
 	static assert(dims == 2);
 	-----------------
  */
+deprecated("Use ArraySerialier's ArrayDimensions instead")
 template ArrayDimensions(T)
 {
 	static if (isArray!T)
