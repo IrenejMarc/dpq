@@ -71,13 +71,17 @@ template SerialiserFor(alias T)
 		alias SerialiserFor = UDAs[0].serialiser;
 	else
 	{
+		alias RT = RealType!T;
+
+		static if (isBuiltinType!RT)
+			alias SerialiserFor = SerialiserFor!RT;
 		// Otherwise, pick one from the bunch of pre-set ones.
-		static if (isArray!T)
+		else static if (isArray!RT)
 			alias SerialiserFor = ArraySerialiser;
 		// Support for SysTime
-		else static if (is(T == SysTime))
+		else static if (is(RT == SysTime))
 			alias SerialiserFor = SysTimeSerialiser;
-		else static if (is(T == class) || is(T == struct))
+		else static if (is(RT == class) || is(RT == struct))
 			alias SerialiserFor = CompositeTypeSerialiser;
 		else
 			static assert(false, "Cannot find serialiser for " ~ T.stringof);
@@ -171,23 +175,7 @@ bool isAnyNull(T)(T val)
 		return false;
 }
 
-// TODO: this for arrays
-Type oidForType(T)()
-		if (!isArray!T)
-{
-	import dpq.connection : _dpqCustomOIDs;
-	enum oid = typeOid!T;
-
-	static if (oid == Type.INFER)
-	{
-		Oid* p;
-		if ((p = relationName!T in _dpqCustomOIDs) != null)
-			return cast(Type) *p;
-	}
-
-	return oid;
-}
-
+deprecated("Use Serialisers and their oidForType instead")
 template typeOid(T)
 {
 		alias TU = std.typecons.Unqual!T;
@@ -264,3 +252,68 @@ unittest
 	static assert(typeOid!(int[][]) == Type.INT4ARRAY, "int[][]");
 	static assert(typeOid!(ubyte[]) == Type.BYTEA, "ubyte[]");
 }
+
+/**
+	Custom serialisers - Serialiser is a struct providing all the required data
+	that dpq needs to serialise/deserialise the custom type, ensure it exists in
+	the schema, and in some cases, receive the type's OID.
+
+	All serialisers must support the following static methods:
+
+	 - static bool isSupportedType(T)();
+	Must return true iff all the other functions in serialiser know how to handle this type
+
+	 - static T deserialise(T)(ubyte[]);
+	Must return T, when given postgresql-compatible representation of the type
+
+	 - static ubyte[] serialise(T)(T val);
+	Must return postgresql-compatible binary representation of the type
+
+	 - static Oid oidForType(T)();
+	Must return the given type's OID, as recognised by PostgreSQL
+
+	 - static string nameForType(T)();
+	Must return a valid, unescaped name for the type, as recognised by PostgreSQL
+
+	 - static void ensureExistence(T)(Connection conn);
+	Must ensure the type exists and can be used in the DB, can simply return 
+	if no work is needed.
+	Must not throw or otherwise fail unless type creation failed, in case the type 
+	does not yet exist, it should be silently created.
+
+	Example:
+		-----------------------
+		struct MyTypeSerialiser
+		{
+			static bool isSupportedType(T)()
+			{
+				// magic
+			}
+
+			static T deserialise(T)(ubyte[])
+			{
+				// magic
+			}
+
+			static ubyte[] serialise(T)(T val)
+			{
+				// magic
+			}
+
+			static Oid oidForType(T)()
+			{
+				// magic
+			}
+
+			static string nameForType(T)()
+			{
+				// magic
+			}
+
+			static void ensureExistence(T)(Connection conn)
+			{
+				// magic
+			}
+		}
+		-----------------------
+ */
