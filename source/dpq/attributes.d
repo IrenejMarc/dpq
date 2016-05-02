@@ -399,7 +399,7 @@ unittest
 	struct Test
 	{
 		@PK int id;
-		@embed Test2 inner;
+		Test2 inner;
 	}
 
 	alias attrs = AttributeList!Test;

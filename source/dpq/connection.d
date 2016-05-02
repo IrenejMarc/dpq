@@ -1029,7 +1029,7 @@ struct Connection
 		{
 			int n;
 			Nullable!int n2;
-			@embed Inner foo;
+			Inner foo;
 		}
 		c.ensureSchema!Test;
 

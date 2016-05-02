@@ -89,7 +89,8 @@ struct Query
 
 		writeln("\t * this()");
 		Query q;
-		assert(q._connection == &c);
+		// Empty constructor uses init values
+		assert(q._connection == null);
 
 		writeln("\t * this(command, params[])");
 		string cmd = "some command";
