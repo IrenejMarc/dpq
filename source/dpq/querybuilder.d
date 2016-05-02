@@ -13,7 +13,6 @@ import std.algorithm : map;
 
 version (unittest) import std.stdio;
 
-
 enum Order : string
 {
 	asc = "ASC",
@@ -28,6 +27,29 @@ private enum QueryType
 	delete_ = "DELETE"
 }
 
+/**
+	Provides a nice way of writing queries in D, as well as some handy shortcuts
+	to working with D structures in the DB.
+
+	Most method names are synonimous with the same keyword in SQL, but their order
+	does not matter.
+	
+	All of the methods can be chained.
+
+	Examples:
+	---------------------
+	auto qb = QueryBuilder()
+			.select("id")
+			.from!User
+			.where("posts > {posts}") // placeholders can be used 
+			.order("posts", Order.desc)
+			.limit(5);
+
+	// Placeholders will be replaced ONLY if they are specified.
+	// No need to escape anything, as it sent with execParams
+	qb["posts"] = 50;
+	---------------------
+ */
 struct QueryBuilder
 {
 	private
@@ -55,11 +77,21 @@ struct QueryBuilder
 		Connection* _connection;
 	}
 
+	/**
+		Constructs a new QueryBuilder with the Connection, so we can directly
+		run queries with it.
+	 */
 	this(ref Connection connection)
 	{
 		_connection = &connection;
 	}
 
+	/**
+		Remembers the given key value pair, replacing the placeholders in the query
+		before running it.
+
+		If the same key is set multiple times, the last value will apply.
+	 */
 	void opIndexAssign(T)(T val, string key)
 	{
 		_params[key] = val;
@@ -78,7 +110,9 @@ struct QueryBuilder
 		assert(qb._params["bar"] == Value("456"));
 	}
 
-	// SELECT methods
+	/**
+		Sets the builder's type to SELECT, a variadic array of column names to select
+	 */
 	ref QueryBuilder select(string[] cols...)
 	{
 		_columns = cols;
@@ -86,7 +120,10 @@ struct QueryBuilder
 		return this;
 	}
 
-
+	/**
+		Same as above, except it accepts a variadic array of Column type. Mostly
+		used internally.
+	 */
 	ref QueryBuilder select(Column[] cols...)
 	{
 		_type = QueryType.select;
@@ -115,6 +152,9 @@ struct QueryBuilder
 		assert(qb._columns == ["foo AS foo_test", "bar"]);
 	}
 
+	/**
+		Sets the builder's FROM value to the given string.
+	 */
 	ref QueryBuilder from(string from)
 	{
 		assert(
@@ -125,6 +165,11 @@ struct QueryBuilder
 		return this;
 	}
 
+	/**
+		Same as above, but instead of accepting a string parameter, it instead
+		accepts a type as a template parameter, then sets the value to that
+		type's relation name. Preferred over the above version.
+	 */
 	ref QueryBuilder from(T)()
 	{
 		return from(relationName!T);
@@ -143,12 +188,23 @@ struct QueryBuilder
 		assert(qb._table == "test");
 	}
 
+	/**
+		Sets the filter string. Placeholders can be used with this, and even
+		positional params, since the order is predictable. Read addParam for
+		more information about that.
+
+		Calling .where again OVERWRITES the previous filter.
+	 */
 	ref QueryBuilder where(string filter)
 	{
 		_filter = filter;
 		return this;
 	}
 
+	/**
+		Same as above, but a shortcut for filtering by one specific column.
+		Calling it again will overwrite both the param and the filter.
+	 */
 	ref QueryBuilder where(T)(string col, T val)
 	{
 		_params["__where_filt"] = Value(val);
@@ -171,6 +227,9 @@ struct QueryBuilder
 		assert(qb._params["__where_filt"] == Value(1));
 	}
 
+	/**
+		Sets the ORDER part of the query. Accepts a column name and an Order value.
+	 */
 	ref QueryBuilder order(string col, Order order)
 	{
 		assert(_type == QueryType.select, "QueryBuilder.order() can only be used for SELECT queries.");
@@ -196,6 +255,9 @@ struct QueryBuilder
 		assert(qb._orders[1] == Order.desc);
 	}
 	
+	/**
+		Sets the LIMIT in the query. Only for SELECT queries, obviously.
+	 */
 	ref QueryBuilder limit(int limit)
 	{
 		assert(_type == QueryType.select, "QueryBuilder.limit() can only be used for SELECT queries.");
@@ -213,6 +275,7 @@ struct QueryBuilder
 		assert(qb._limit == 1);
 	}
 
+	/// OFFSET for queries
 	ref QueryBuilder offset(int offset)
 	{
 		assert(_type == QueryType.select, "QueryBuilder.offset() can only be used for SELECT queries.");
