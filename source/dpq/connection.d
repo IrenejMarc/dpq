@@ -18,7 +18,6 @@ import dpq.serialisers.composite;
 
 
 import std.string;
-//import derelict.pq.pq;
 import libpq.libpq;
 import std.conv : to;
 import std.traits;
@@ -42,7 +41,7 @@ version(unittest)
 */
 struct Connection
 {
-	alias ConnectionPtr = SmartPointer!(PGconn*, PQfinish);
+	private alias ConnectionPtr = SmartPointer!(PGconn*, PQfinish);
 
 	private ConnectionPtr _connection;
 	private PreparedStatement[string] _prepared;
@@ -80,7 +79,7 @@ struct Connection
 	}
 
 	/** 
-		Close the connection manually 
+		Close the connection manually
 	*/
 	void close()
 	{
@@ -122,10 +121,11 @@ struct Connection
 		return PQport(_connection).fromStringz.to!ushort;
 	}
 
-	/** // FIXME: BROKEN ATM
+	/**
 		Executes the given string directly
 
-		Throws on fatal query errors like bad syntax
+		Throws on fatal query errors like bad syntax.
+		WARNING: Only returns textual values!!!
 
 		Examples:
 		----------------
@@ -140,7 +140,6 @@ struct Connection
 		return Result(res);
 	}
 
-	/*
 	unittest
 	{
 		auto res = c.exec("SELECT 1::INT4 AS int4, 2::INT8 AS some_long");
@@ -149,15 +148,14 @@ struct Connection
 		assert(res.columns == 2);
 
 		auto r = res[0];
-		assert(r[0].as!int == 1);
-		assert(r[0].as!long == 2);
+		assert(r[0].as!string == "1");
+		assert(r[1].as!string == "2");
 
 		writeln(" * Row opIndex(int) and opIndex(string) equality ");
 		assert(r[0] == r["int4"]);
 		assert(r[1] == r["some_long"]);
 
 	}
-	*/
 
 	/// ditto, async
 	bool send(string command)
@@ -194,6 +192,7 @@ struct Connection
 	}
 
 
+	/// ditty, but async
 	void sendParams(T...)(string command, T params)
 	{
 		Value[] values;
@@ -201,49 +200,6 @@ struct Connection
 			values ~= Value(param);
 
 		execParams(command, values, true);
-	}
-
-	unittest
-	{
-		auto res = c.execParams("SELECT 1::INT4 AS int4, 2::INT8 AS some_long", []);
-		writeln("\t * execParams");
-		writeln("\t\t * Rows and cols");
-
-		assert(res.rows == 1);
-		assert(res.columns == 2);
-
-		writeln("\t\t * Static values");
-		auto r = res[0];
-		assert(r[0].as!int == 1);
-		assert(r[1].as!long == 2);
-
-		writeln("\t\t * opIndex(int) and opIndex(string) equality");
-		assert(r[0] == r["int4"]);
-		assert(r[1] == r["some_long"]);
-
-		int int4 = 1;
-		long int8 = 2;
-		string str = "foo bar baz";
-		float float4 = 3.14;
-		double float8 = 3.1415;
-
-		writeln("\t\t * Passed values");
-		res = c.execParams(
-				"SELECT $1::INT4, $2::INT8, $3::TEXT, $4::FLOAT4, $5::FLOAT8",
-				int4,
-				int8,
-				str,
-				float4,
-				float8);
-
-		assert(res.rows == 1);
-		r = res[0];
-
-		assert(r[0].as!int == int4);
-		assert(r[1].as!long == int8);
-		assert(r[2].as!string == str);
-		assert(r[3].as!float == float4);
-		assert(r[4].as!double == float8);
 	}
 
 	/// ditto, but taking an array of params, instead of variadic template
@@ -288,6 +244,51 @@ struct Connection
 		execParams(command, params, true);
 	}
 
+	unittest
+	{
+		writeln("\t * execParams");
+		writeln("\t\t * Rows and cols");
+
+		// we're not testing value here, specify types in the query to avoid any oid issues
+		auto res = c.execParams("SELECT 1::INT4 AS int4, 2::INT8 AS some_long", []);
+		assert(res.rows == 1);
+		assert(res.columns == 2);
+
+		writeln("\t\t * Static values");
+		auto r = res[0];
+		assert(r[0].as!int == 1);
+		assert(r[1].as!long == 2);
+
+		writeln("\t\t * opIndex(int) and opIndex(string) equality");
+		assert(r[0] == r["int4"]);
+		assert(r[1] == r["some_long"]);
+
+		int int4 = 1;
+		long int8 = 2;
+		string str = "foo bar baz";
+		float float4 = 3.14;
+		double float8 = 3.1415;
+
+		writeln("\t\t * Passed values");
+		res = c.execParams(
+				"SELECT $1::INT4, $2::INT8, $3::TEXT, $4::FLOAT4, $5::FLOAT8",
+				int4,
+				int8,
+				str,
+				float4,
+				float8);
+
+		assert(res.rows == 1);
+		r = res[0];
+
+		// This should probably be tested by the serialisers, not here.
+		assert(r[0].as!int == int4);
+		assert(r[1].as!long == int8);
+		assert(r[2].as!string == str);
+		assert(r[3].as!float == float4);
+		assert(r[4].as!double == float8);
+	}
+
 	/**
 		Returns the last error message
 
@@ -297,7 +298,6 @@ struct Connection
 
 		writeln(conn.errorMessage);
 		--------------------
-		
 	 */
 	@property string errorMessage()
 	{
@@ -316,6 +316,9 @@ struct Connection
 		assert(c.errorMessage.length != 0);
 	}
 
+	/**
+		Escapes a string, to be used in a query
+	 */
 	string escapeLiteral(string str)
 	{
 		const(char)* cStr = str.toStringz;
@@ -329,6 +332,9 @@ struct Connection
 		return str;
 	}
 
+	/**
+		Escapes an identifier (column, function, table name, ...) to be used in a query.
+	 */
 	string escapeIdentifier(string str)
 	{
 		const(char)* cStr = str.toStringz;
@@ -425,8 +431,7 @@ struct Connection
 		return additionalQueries;
 	}
 
-
-	void addOidsFor(string typeName)
+	package void addOidsFor(string typeName)
 	{
 		auto r = execParams("SELECT $1::regtype::oid, $2::regtype::oid", typeName, typeName ~ "[]");
 		Oid typeOid = r[0][0].as!int;
@@ -489,7 +494,7 @@ struct Connection
 			@serial8 @PK long id;
 			string str;
 			int n;
-			@embed Inner inner;
+			Inner inner;
 		}
 
 		c.ensureSchema!TestTable1;
@@ -538,7 +543,6 @@ struct Connection
 			int bar;
 			long baz;
 			int[] intArr;
-			//string[] stringArr; // TODO: string[]
 		}
 
 		c.ensureSchema!Testy;
@@ -547,8 +551,9 @@ struct Connection
 		auto shouldBeNull = c.findOne!Testy(0);
 		assert(shouldBeNull.isNull);
 
-		c.exec("INSERT INTO " ~ relationName!Testy ~ " (id, foo, bar, baz, " ~ attributeName!(Testy.intArr) ~ ") "~
-				"VALUES (1, 'somestr', 2, 3, '{1,2,3}')");
+		c.exec(
+				"INSERT INTO %s (id, foo, bar, baz, %s) VALUES (1, 'somestr', 2, 3, '{1,2,3}')".format(
+					relationName!Testy, attributeName!(Testy.intArr)));
 
 		writeln("\t\t * Valid result");
 		Testy t = c.findOne!Testy(1);
@@ -557,7 +562,6 @@ struct Connection
 		assert(t.bar == 2, `t.bar == 2`);
 		assert(t.baz == 3, `t.baz == 3`);
 		assert(t.intArr == [1,2,3], `t.intArr == [1,2,3]`);
-		//assert(t.stringArr == ["asd", "qwe"]);
 
 		writeln("\t\t * findOne with custom filter");
 		Testy t2 = c.findOne!Testy("id = $1", 1);
@@ -567,7 +571,7 @@ struct Connection
 	}
 
 	/**
-		Returns the requestes structure, searches by the given column name
+		Returns the requested structure, searches by the given column name
 		with the given value
 		If not rows are returned, a Nullable null value is returned
 
@@ -592,10 +596,8 @@ struct Connection
 		QueryBuilder qb;
 		qb.select(members)
 			.from(relationName!T)
-			.where( col ~ " = {col_" ~ col ~ "}")
+			.where(col, val)
 			.limit(1);
-
-		qb["col_" ~ col] = val;
 
 		auto q = qb.query(this);
 
@@ -726,6 +728,25 @@ struct Connection
 		c.exec("DROP TABLE find_test");
 	}
 
+	/**
+		Updates records filtered by the filter string, setting the values
+		as specified in the update string. Both should be SQL-syntax
+
+		Useful when updating just a single or a bunch of values in the table, or
+		when setting the values relatively to their current value.
+
+		Params:
+			filter = the SQL filter string
+			update = the SQL update string
+			vals   = values to be used in the query
+
+		Examples:
+		----------------
+		Connection c; // an established connection
+		struct User { int id; int posts ...}
+		c.update!User("id = $1", "posts = posts + $2", 123, 1);
+		----------------
+	 */
 	int update(T, U...)(string filter, string update, U vals)
 	{
 		QueryBuilder qb;
@@ -770,6 +791,7 @@ struct Connection
 		c.exec("DROP TABLE update_test");
 	}
 
+	/// ditto, async
 	void updateAsync(T, U...)(string filter, string update, U vals)
 	{
 		QueryBuilder qb;
@@ -780,6 +802,24 @@ struct Connection
 		qb.query(this).runAsync(vals);
 	}
 
+	/**
+		Similar to above update, but instead of acceptign a filter and and update string,
+		always filters by the PK and updates with absolute values from the updates AA.
+
+		Params:
+			id      = the value of the relation's PK to filter by
+			updates = an AA, mapping column name to the new value to be set for the column
+			async   = optionally send this query async
+
+		Examples:
+		------------------
+			Connection c; // en established connection
+			struct User { @PK int id; int x; string y }
+			c.update!User(1, [
+					"x": Value(2),
+					"y": Value("Hello there")]);
+		------------------
+	 */
 	int update(T, U)(U id, Value[string] updates, bool async = false)
 	{
 		QueryBuilder qb;
@@ -822,11 +862,28 @@ struct Connection
 		c.exec("DROP TABLE update_aa_test");
 	}
 
+	// ditto, but async
 	void updateAsync(T, U)(U id, Value[string] updates)
 	{
 		update!T(id, updates, true);
 	}
 
+	/**
+		Similar to above, but accepts the whole structure as an update param.
+		Filters by the PK, updates ALL the values in the filtered rows.
+
+		Params:
+			id = value of the relation's PK to filter by
+			updates = the structure that will provide values for the UPDATE
+			asnyc = whether the query should be sent async
+
+		Examples:
+		------------------
+		Connection c; // an established connection
+		struct User { @PK int id; int a; int b; }
+		c.update(1, myUser);
+		------------------
+	 */
 	int update(T, U)(U id, T updates, bool async = false)
 	{
 		import dpq.attributes;
@@ -848,6 +905,12 @@ struct Connection
 
 		auto r = q.run();
 		return r.rows;
+	}
+
+	// ditto, async
+	void updateAsync(T, U)(U id, T updates)
+	{
+		update!T(id, updates, true);
 	}
 
 	unittest
@@ -884,12 +947,6 @@ struct Connection
 		c.exec("DROP TABLE update_object_test");
 	}
 
-	void updateAsync(T, U)(U id, T updates)
-	{
-		update!T(id, updates, true);
-	}
-
-
 	private void addVals(T, U)(ref QueryBuilder qb, U val)
 	{
 		if (isAnyNull(val))
@@ -906,6 +963,20 @@ struct Connection
 		}
 	}
 
+	/**
+		Inserts the given structure, returning whatever columns are specified by the
+		second param as a normal Result.
+
+		Equivalent to specifying RETURNING at the end of the query.
+
+		Examples:
+		-------------------
+		Connection c; // an established connection
+		struct Data { @PK int id, int a; int b; }
+		Data myData;
+		auto result = c.insert(myData, "id");
+		-------------------
+	 */
 	Result insertR(T)(T val, string ret = "")
 	{
 		QueryBuilder qb;
@@ -918,6 +989,17 @@ struct Connection
 		return qb.query(this).run();
 	}
 
+	/**
+		Inserts the given structure to the DB
+
+		Examples:
+		---------------
+		Connection c; // An established connection
+		struct User {@PK @serial int id; int a }
+		User myUser;
+		c.insert(myUser);
+		---------------
+	 */
 	bool insert(T)(T val, bool async = false)
 	{
 		QueryBuilder qb;
@@ -981,11 +1063,22 @@ struct Connection
 		c.exec("DROP TYPE \"%s\" CASCADE".format(relationName!Inner));
 	}
 
+	/// ditto, async
 	void insertAsync(T)(T val)
 	{
 		insert(val, true);
 	}
 
+	/**
+		Deletes the record in the given table, by its PK
+
+		Examples:
+		---------------
+		Connection c; // An established connection
+		struct User {@PK @serial int id; int a }
+		c.remove!User(1);
+		---------------
+	 */
 	int remove(T, U)(U id)
 	{
 		QueryBuilder qb;
@@ -995,6 +1088,7 @@ struct Connection
 		return qb.query(this).run().rows;
 	}
 
+	// ditto, async
 	bool removeAsync(T, U)(U id)
 	{
 		QueryBuilder qb;
@@ -1005,6 +1099,16 @@ struct Connection
 	}
 
 
+	/**
+		Deletes rows in the specified relation, filtered by the given filter string and values
+
+		Examples:
+		---------------
+		Connection c; // An established connection
+		struct User { @PK @serial int id; int posts }
+		c.remove!User("id > $1 AND posts == $2", 50, 0);
+		---------------
+	 */
 	int remove(T, U...)(string filter, U vals)
 	{
 		QueryBuilder qb;
@@ -1017,6 +1121,7 @@ struct Connection
 		return qb.query(this).run().rows;
 	}
 
+	/// ditto, async
 	bool removeAsync(T, U...)(string filter, U vals)
 	{
 		QueryBuilder qb;
@@ -1064,6 +1169,18 @@ struct Connection
 		c.exec("DROP TABLE remove_test");
 	}
 
+	/**
+		Returns a count of the rows matching the filter in the specified relation.
+		Filter can be empty or not given to select a count of all the rows in the relation.
+
+		Examples:
+		---------------
+		Connection c; // An established connection
+		struct User {@PK @serial int id; int a }
+		long nUsers = c.count!User;
+		nUsers = c.count!User("id > $1", 123);
+		---------------
+	 */
 	long count(T, U...)(string filter = "", U vals = U.init)
 	{
 		import dpq.query;
@@ -1102,6 +1219,10 @@ struct Connection
 		c.exec("DROP TABLE test_count");
 	}
 
+	/**
+		Equivalent to calling PQisBusy from libpq. Only useful if you're doing async
+		stuff manually.
+	 */
 	bool isBusy()
 	{
 		return PQisBusy(_connection) == 1;
@@ -1115,6 +1236,7 @@ struct Connection
 
 		c.send("SELECT 1::INT");
 
+		// This could fail in theory, but in practice ... fat chance.
 		assert(c.isBusy() == true);
 
 		c.nextResult();
@@ -1127,25 +1249,18 @@ struct Connection
 
 		 If no more results remain, a null result will be returned
 
-		 Make sure to call this until a null is returned.
+		 Make sure to call this until a null is returned or just use allResults.
 	*/
 	Result nextResult()
 	{
-		import core.thread;
-
-		/*
-		do
-		{
-			PQconsumeInput(_connection);
-			//Thread.sleep(dur!"msecs"(1)); // What's a reasonable amount of time to wait?
-		}
-		while (isBusy());
-		*/
-
 		PGresult* res = PQgetResult(_connection);
 		return Result(res);
 	}
 
+	/**
+		Calls nextResult until the value returned is null, the returns them
+		as an array.
+	 */
 	Result[] allResults()
 	{
 		Result[] res;
@@ -1157,6 +1272,9 @@ struct Connection
 		return res;
 	}
 	
+	/**
+		Calls nextResult until null is returned, then retuns only the last non-null result.
+	 */
 	Result lastResult()
 	{
 		Result res;
@@ -1309,7 +1427,7 @@ T deserialise(T)(Row r, string prefix = "")
 	foreach (m; serialisableMembers!T)
 	{
 		enum n = attributeName!(mixin("T." ~ m));
-		alias mType = Unqual!(typeof(mixin("T." ~ m)));
+		alias mType = RealType!(typeof(mixin("T." ~ m)));
 
 		try
 		{
@@ -1328,4 +1446,3 @@ T deserialise(T)(Row r, string prefix = "")
 
 /// Hold the last created connection, not to be used outside the library
 package Connection* _dpqLastConnection;
-

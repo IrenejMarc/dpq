@@ -1,6 +1,12 @@
+/** 
+ Just about the most useless module around, but I wanted to keep it nice and tidy
+ */
 module dpq.column;
 
-struct Column
+/**
+ Used internally to keep track of colums and their AS names when selected/inserted.
+ */
+package struct Column
 {
 	string column;
 	string _asName;
