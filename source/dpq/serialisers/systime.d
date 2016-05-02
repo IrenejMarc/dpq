@@ -72,6 +72,5 @@ unittest
 	SysTime time = Clock.currTime;
 	auto serialised = SysTimeSerialiser.serialise(time);
 
-	writefln("Serialised: %s", serialised);
 	assert(SysTimeSerialiser.deserialise!SysTime(serialised).toUnixTime == time.toUnixTime);
 }
