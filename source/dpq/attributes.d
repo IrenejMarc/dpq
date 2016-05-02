@@ -7,93 +7,120 @@ import std.typecons;
 import dpq.column;
 import dpq.meta;
 
-version(unittest)
-{
-	import std.stdio;
-}
+version(unittest) import std.stdio;
 
+/** 
+	@relation attribute -- specifies the relation/type name to be used
+	for Connection's ORM functions. If none is set, dpq will
+	default to the structure's name in lower_snake_case.
+ */
 RelationAttribute relation(string name)
 {
 	return RelationAttribute(name);
 }
 
-struct RelationAttribute
+package struct RelationAttribute
 {
 	string name;
 }
 
 enum EmbedAttribute;
-alias embed = EmbedAttribute;
+deprecated("There is no need to use @embed anymore, Serialisers should take care of it")
+	alias embed = EmbedAttribute;
 
+/**
+	@attribute / @attr -- specifies the name of the attribute to be used.
+
+	Defaults to member's name in lower_snake_case if nothing is specified
+ */
 AttributeAttribute attribute(string name)
 {
 	return AttributeAttribute(name);
 }
 alias attr = attribute;
 
-struct AttributeAttribute
+package struct AttributeAttribute
 {
 	string name;
 }
 
-@property PrimaryKeyAttribute PrimaryKey()
-{
-	return PrimaryKeyAttribute();
-}
+/**
+	@PK / @Pkey / @PrimaryKey attribute -- specifies that the member should be
+	a PK. Coumpound PKs are not supported.
+ */
+package enum PrimaryKeyAttribute;
 
+alias PrimaryKey = PrimaryKeyAttribute;
 alias PKey = PrimaryKey;
 alias PK = PrimaryKey;
 
-struct PrimaryKeyAttribute
-{
-}
 
 
+/**
+	Specifies the type for the member, overrides any serialiser-provided type
+ */
 PGTypeAttribute type(string type)
 {
 	return PGTypeAttribute(type);
 }
 
+/// Shortcut for @type("SERIAL")
 @property PGTypeAttribute serial()
 {
 	return PGTypeAttribute("SERIAL");
 }
 
+/// SHORTCUT for @type("SERIAL4")
 @property PGTypeAttribute serial4()
 {
 	return PGTypeAttribute("SERIAL4");
 }
 
+/// SHORTCUT for @type("SERIAL8")
 @property PGTypeAttribute serial8()
 {
 	return PGTypeAttribute("SERIAL8");
 }
 
-
-struct PGTypeAttribute
+package struct PGTypeAttribute
 {
 	string type;
 }
 
-enum IgnoreAttribute;
+/**
+	Specifies that the member should be completely ignored as far as the DB is
+	concerned.
+ */
+package enum IgnoreAttribute;
 alias ignore = IgnoreAttribute;
 
-struct IndexAttribute
+/**
+	Specifies that the member/column should have an index created on it.
+	If unique is set, it well be a unique index. 
+ */
+package struct IndexAttribute
 {
 	bool unique = false;
 }
 
+/// @index
 @property IndexAttribute index()
 {
 	return IndexAttribute();
 }
 
+/// @uniqueIndex
 @property IndexAttribute uniqueIndex()
 {
 	return IndexAttribute(true);
 }
 
-struct ForeignKeyAttribute
+/**
+	Specifies that the member is a foriegn key, ensureSchema will create a FK 
+	constraint as well as an index for it. Finds the referenced table's PK
+	by itself.
+ */
+package struct ForeignKeyAttribute
 {
 	string relation;
 	string pkey;
@@ -106,6 +133,11 @@ struct ForeignKeyAttribute
 alias FK = foreignKey;
 alias FKey = foreignKey;
 
+/**
+	Transforms the given string into lower_snake_case at compile-time.
+	Used for attribute and relation names and probably not very useful
+	outside the library itself.
+ */
 template SnakeCase(string str)
 {
 	import std.string : toLower;
@@ -146,6 +178,10 @@ unittest
 	static assert(SnakeCase!"some_thing" == "some_thing");
 }
 
+/**
+	Relation/type name for the given type, can be set with @relation attribute.
+	If @relation is not set, type's name will be lower_snake_cased.
+ */
 template relationName(alias R)
 {
 	static if (hasUDA!(R, RelationAttribute))
@@ -173,7 +209,11 @@ unittest
 	static assert(relationName!Test2 == "some_random_name");
 }
 
-
+/**
+	Attribute name for the given type, can be specified with @attribute.
+	If @attribute is not specified, the member's name will just be 
+	lower_snake_cased and returned.
+ */
 template attributeName(alias R)
 {
 	static if (hasUDA!(R, AttributeAttribute))
@@ -198,7 +238,10 @@ unittest
 }
 
 
-// Workaround for getSymbolsByUDA not working on structs/classes with private members
+/**
+ Workaround for getSymbolsByUDA not working on structs/classes with private members.
+ Returns all the structure's members that have the given UDA.
+ */
 template getMembersByUDA(T, alias attribute)
 {
 	import std.meta : Filter;
@@ -218,11 +261,22 @@ unittest
 		@FK!Test int id3;
 	}
 
-	static assert(getMembersByUDA!(Test, PrimaryKeyAttribute)[0] == "id");
-	static assert(getMembersByUDA!(Test, ForeignKeyAttribute)[0] == "id2");
-	static assert(getMembersByUDA!(Test, ForeignKeyAttribute)[1] == "id3");
+	alias FKMembers = getMembersByUDA!(Test, ForeignKeyAttribute);
+	alias PKMembers = getMembersByUDA!(Test, PrimaryKeyAttribute);
+
+	static assert(PKMembers.length == 1);
+	static assert(PKMembers[0] == "id");
+
+	static assert(FKMembers.length == 2);
+	static assert(FKMembers[0] == "id2");
+	static assert(FKMembers[1] == "id3");
+
+	static assert(getMembersByUDA!(Test, IgnoreAttribute).length == 0);
 }
 
+/**
+	Returns a string containing the name of the type member that is marked with @PK
+ */
 template primaryKeyName(T)
 {
 	alias fields = getMembersByUDA!(T, PrimaryKeyAttribute);
@@ -233,6 +287,9 @@ template primaryKeyName(T)
 	enum primaryKeyName = mixin(fields[0].stringof);
 }
 
+/**
+	Returns the name of the PK attribute (SQL name)
+ */
 template primaryKeyAttributeName(T)
 {
 	enum primaryKeyAttributeName = attributeName!(mixin("T." ~ primaryKeyName!T));
@@ -254,6 +311,9 @@ unittest
 	static assert(primaryKeyAttributeName!Test == "my_pk");
 }
 
+/**
+	Returns true if the member m is a PK on T.
+ */
 template isPK(alias T, string m)
 {
 	enum isPK = hasUDA!(mixin("T." ~ m), PrimaryKeyAttribute);
@@ -272,7 +332,7 @@ unittest
 	static assert(!isPK!(Test, "a"));
 }
 
-template embeddedPrefix(T, string name)
+deprecated template embeddedPrefix(T, string name)
 {
 	import std.string : format;
 	enum embeddedPrefix ="_%s_%s_".format(
@@ -280,12 +340,20 @@ template embeddedPrefix(T, string name)
 			SnakeCase!name);
 }
 
+/**
+	Returns a list of Columns for all the given type's serialisable members,
+	with their actual names as they're used in SQL.
+
+	Params:
+		prefix   = prefix to use, if any
+		asPrefix = asPrefix, prefix to use for column's AS names
+		ignorePK = whether to ignore the PK, useful for inserts and similar
+ */
 template AttributeList2(
 		T,
 		string prefix = "",
 		string asPrefix = "",
 		bool ignorePK = false,
-		bool insert = false,
 		fields...)
 {
 	static if (fields.length == 0)
@@ -296,7 +364,7 @@ template AttributeList2(
 
 		// Ignore the PK
 		static if (ignorePK && isPK!(T, fields[0]) || hasUDA!(IgnoreAttribute, mixin("T." ~ fields[0])))
-			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, insert, fields[1 .. $]);
+			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, fields[1 .. $]);
 		else
 		{
 			enum attrName = attributeName!(mixin("T." ~ fields[0]));
@@ -307,10 +375,15 @@ template AttributeList2(
 							prefix,
 							asPrefix,
 							ignorePK,
-							insert,
 							fields[1 .. $]);
 		}
 	}
+}
+
+template AttributeList(T, bool ignorePK = false, bool insert = false)
+{
+	alias AttributeList = AttributeList2!(T, "", "", ignorePK, serialisableMembers!(T));
+	static assert(AttributeList.length > 0, "AttributeList found no fields, for " ~ T.stringof ~ " cannot continue");
 }
 
 unittest
@@ -329,28 +402,25 @@ unittest
 		@embed Test2 inner;
 	}
 
-	static assert(AttributeList!Test[0] == Column("id", "id"));
-	static assert(AttributeList!Test[1] == Column("inner", "inner"));
+	alias attrs = AttributeList!Test;
+	static assert(attrs[0] == Column("id", "id"));
+	static assert(attrs[1] == Column("inner", "inner"));
 
 	// ignorePK
 	static assert(AttributeList!(Test, true)[0] == Column("inner", "inner"));
 
 	// INSERT syntax, with ignorePK
-	static assert(AttributeList!(Test, true, true)[0] == Column("inner", "inner"));
-
-
+	static assert(AttributeList!(Test, true)[0] == Column("inner", "inner"));
 }
 
-template AttributeList(T, bool ignorePK = false, bool insert = false)
-{
-	alias AttributeList = AttributeList2!(T, "", "", ignorePK, insert, serialisableMembers!(T));
-	static assert(AttributeList.length > 0, "AttributeList found no fields, for " ~ T.stringof ~ " cannot continue");
-}
-
+/**
+	Gives a list of all the structure's members that will be used in the DB.
+	Ignores @ignore members, non-RW and non-public members.
+ */
 template serialisableMembers(T)
 {
-	alias NT = NoNullable!T;
-	alias serialisableMembers = filterSerialisableMembers!(NT, __traits(allMembers, NT));
+	alias RT = RealType!T;
+	alias serialisableMembers = filterSerialisableMembers!(RT, __traits(allMembers, RT));
 }
 
 unittest
@@ -370,6 +440,7 @@ unittest
 	static assert(serialisableMembers!Test[1] == "b");
 }
 
+/// A filter implementation for serialisableMembers
 template filterSerialisableMembers(T, fields...)
 {
 	static if (fields.length == 0)
@@ -380,7 +451,9 @@ template filterSerialisableMembers(T, fields...)
 		static if (isRWPlainField!(T, m) || isRWField!(T, m))
 		{
 			static if (!hasUDA!(mixin("T." ~ m), IgnoreAttribute))
-				alias filterSerialisableMembers = TypeTuple!(TypeTuple!(m), filterSerialisableMembers!(T, fields[1 .. $]));
+				alias filterSerialisableMembers = TypeTuple!(
+						TypeTuple!(m),
+						filterSerialisableMembers!(T, fields[1 .. $]));
 			else
 				alias filterSerialisableMembers = filterSerialisableMembers!(T, fields[1 .. $]);
 		}
@@ -391,7 +464,7 @@ template filterSerialisableMembers(T, fields...)
 
 
 /*
-	 Functions below
+	Functions/templates isRWPlainField, isRWField, isPublicMember and isNonStaticMember.
 
 	Extensions to `std.traits` module of Phobos. Some may eventually make it into Phobos,
 	some are dirty hacks that work only for vibe.d
@@ -475,13 +548,18 @@ template isNonStaticMember(T, string M)
 {
 	import std.typetuple;
 	import std.traits;
-
+	
 	alias MF = TypeTuple!(__traits(getMember, T, M));
-	static if (M.length == 0) {
-		enum isNonStaticMember = false;
-	} else static if (anySatisfy!(isSomeFunction, MF)) {
-		enum isNonStaticMember = !__traits(isStaticFunction, MF);
-	} else {
+	static if (M.length == 0)
+	{
+	    enum isNonStaticMember = false;
+	}
+	else static if (anySatisfy!(isSomeFunction, MF))
+	{
+	    enum isNonStaticMember = !__traits(isStaticFunction, MF);
+	}
+	else
+	{
 		enum isNonStaticMember = !__traits(compiles, (){ auto x = __traits(getMember, T, M); }());
 	}
 }
