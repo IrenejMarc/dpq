@@ -178,6 +178,15 @@ bool isAnyNull(T)(T val)
 		return false;
 }
 
+/**
+	Shortuct to the type's serialiser's oidForType
+ */
+Oid oidFor(T)()
+{
+	alias RT = RealType!T;
+	return SerialiserFor!RT.oidForType!RT;
+}
+
 deprecated("Use Serialisers and their oidForType instead")
 template typeOid(T)
 {
