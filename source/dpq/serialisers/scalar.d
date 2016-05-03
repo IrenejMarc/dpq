@@ -71,7 +71,7 @@ struct ScalarSerialiser
 	}
 
 	private static enum _Type[string] _supportedTypes = [
-		"bool":   _Type(Type.INT4,   "BOOL"),
+		"bool":   _Type(Type.BOOL,   "BOOL"),
 
 		"byte":   _Type(Type.CHAR,   "CHAR"),
 		"char":   _Type(Type.CHAR,   "CHAR"),
