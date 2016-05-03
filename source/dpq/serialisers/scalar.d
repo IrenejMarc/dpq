@@ -85,7 +85,7 @@ struct ScalarSerialiser
 		"long":   _Type(Type.INT8,   "INT8"),
 
 		"float":  _Type(Type.FLOAT4, "FLOAT4"),
-		"double": _Type(Type.INT4,   "FLOAT8")
+		"double": _Type(Type.FLOAT8,   "FLOAT8")
 	];
 }
 
