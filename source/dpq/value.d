@@ -143,23 +143,6 @@ struct Value
 	}
 
 	void opAssign(T)(T val)
-			if (isArray!T)
-	{
-		_size = (ForeachType!T.sizeof * val.length).to!int;
-
-		static if (is(T == ubyte[]))
-			_valueBytes = val;
-		else
-		{
-			_valueBytes = toBytes(val);
-			_size = _valueBytes.length.to!int;
-		}
-
-		_type = typeOid!T;
-	}
-
-	void opAssign(T)(T val)
-			if(!isArray!T)
 	{
 		if (isAnyNull(val))
 		{
@@ -172,24 +155,7 @@ struct Value
 
 		_valueBytes = toBytes(val);
 		_size = _valueBytes.length.to!int;
-		_type = typeOid!T;
-	}
-
-	void opAssign(string val)
-	{
-		import std.string;
-
-		_valueBytes = val.representation.dup;
-		_size = _valueBytes.length.to!int;
-		_type = Type.TEXT;
-	}
-
-	void opAssign(SysTime val)
-	{
-		_type = typeOid!SysTime;
-		_size = typeof(val.stdTime).sizeof;
-
-		_valueBytes = toBytes(val);
+		_type = cast(Type) oidFor!T;
 	}
 	
 	void opAssign(Value val)
