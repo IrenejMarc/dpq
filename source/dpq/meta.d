@@ -89,7 +89,7 @@ template RealType(T)
 {
 	import std.typecons : TypedefType;
 	// Ugly, but better than doing this every time we need it
-	alias NT = Unqual!(NoNullable!(TypedefType!T));
+	alias NT = OriginalType!(Unqual!(NoNullable!(TypedefType!T)));
 
 	static if (is(T == NT))
 		alias RealType = NT;

@@ -1433,18 +1433,20 @@ T deserialise(T)(Row r, string prefix = "")
 	T res;
 	foreach (m; serialisableMembers!T)
 	{
-		enum n = attributeName!(mixin("T." ~ m));
-		alias mType = RealType!(typeof(mixin("T." ~ m)));
+		enum member = "T." ~ m;
+		enum n = attributeName!(mixin(member));
+		alias OType = typeof(mixin(member));
+		alias MType = RealType!OType;
 
 		try
 		{
-			auto x = r[prefix ~ n].as!mType;
+			auto x = r[prefix ~ n].as!MType;
 			if (!x.isNull)
-				__traits(getMember, res, m) = cast(TypedefType!(mType)) x;
+				__traits(getMember, res, m) = cast(OType) x;
 		}
 		catch (DPQException e) 
 		{
-			if (!isInstanceOf!(Nullable, mType))
+			if (!isInstanceOf!(Nullable, MType))
 				throw e;
 		}
 	}

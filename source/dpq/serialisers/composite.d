@@ -111,7 +111,8 @@ struct CompositeTypeSerialiser
 		foreach (mName; members)
 		{
 			auto member = __traits(getMember, result, mName);
-			alias MT = RealType!(typeof(member));
+			alias OT = typeof(member);
+			alias MT = RealType!OT;
 
 			Oid oid = cast(Oid) bytes.read!int;
 			auto mLen = bytes.read!int;
@@ -121,7 +122,7 @@ struct CompositeTypeSerialiser
 				continue;
 
 			// Read the value
-			__traits(getMember, result, mName) = fromBytes!MT(bytes[0 .. mLen], mLen);
+			__traits(getMember, result, mName) = cast(OT) fromBytes!MT(bytes[0 .. mLen], mLen);
 
 			// "Consume" the bytes that were just read
 			bytes = bytes[mLen .. $];
