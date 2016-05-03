@@ -369,7 +369,14 @@ struct Connection
 		{
 			// Is there a better way to do this?
 			enum member = "T." ~ mName;
-			alias MType = RealType!(typeof(mixin(member)));
+
+			// If the member is a property, typeof will fail with the wront context error
+			// so we construct it and then check the type
+			static if (is(FunctionTypeOf!(mixin(member)) == function))
+				alias MType = RealType!(typeof(mixin("T()." ~ mName)));
+			else
+				alias MType = RealType!(typeof(mixin(member)));
+
 			alias serialiser = SerialiserFor!MType;
 
 			// The attribute's name
@@ -407,7 +414,7 @@ struct Connection
 				additionalQueries ~= "CREATE INDEX %s ON %s (%s)".format(
 						escapeIdentifier("%s_%s_fk_index".format(relName, attrName)),
 						escRelName,
-						escAttr);
+						escAttrName);
 			}
 			else static if (hasUDA!(mixin(member), IndexAttribute))
 			{
