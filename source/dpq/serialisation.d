@@ -6,6 +6,7 @@ import dpq.serialisers.array;
 import dpq.serialisers.scalar;
 import dpq.serialisers.systime;
 import dpq.serialisers.string;
+import dpq.serialisers.bytea;
 
 import dpq.meta;
 import dpq.attributes;
@@ -53,6 +54,8 @@ template SerialiserFor(T)
 {
 	static if (isSomeString!T)
 		alias SerialiserFor = StringSerialiser;
+	else static if (is(T == ubyte[]))
+		alias SerialiserFor = ByteaSerialise;
 	else static if (isArray!T)
 		alias SerialiserFor = ArraySerialiser;
 	else static if (isScalarType!T)
