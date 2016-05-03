@@ -1,5 +1,9 @@
 module dpq.serialisers.bytea;
 
+import libpq.libpq : Oid;
+import dpq.value : Type;
+import dpq.connection : Connection;
+
 struct ByteaSerialiser
 {
 	static bool isSupportedType(T)()
@@ -14,7 +18,7 @@ struct ByteaSerialiser
 				"'%s' is not supported by ByteaSerialiser".format(T.stringof));
 	}
 
-	static T deserialise(T)(ubyte[] val)
+	static T deserialise(T)(const(ubyte)[] val)
 	{
 		enforceSupportedType!T;
 

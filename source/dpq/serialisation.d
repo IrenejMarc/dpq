@@ -34,7 +34,7 @@ package Nullable!(ubyte[]) toBytes(T)(T val)
 		return Nullable!(ubyte[]).init;
 
 	alias serialiser = SerialiserFor!AT;
-	return serialiser.serialise(cast(AT) val);
+	return Nullable!(ubyte[])(serialiser.serialise(cast(AT) val));
 }
 
 /*****************************************************************************/
@@ -55,7 +55,7 @@ template SerialiserFor(T)
 	static if (isSomeString!T)
 		alias SerialiserFor = StringSerialiser;
 	else static if (is(T == ubyte[]))
-		alias SerialiserFor = ByteaSerialise;
+		alias SerialiserFor = ByteaSerialiser;
 	else static if (isArray!T)
 		alias SerialiserFor = ArraySerialiser;
 	else static if (isScalarType!T)
