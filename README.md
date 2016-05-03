@@ -35,7 +35,13 @@ MIT, read LICENSE.txt
 import std.stdio;
 import std.typecons : Nullable;
 
+import std.datetime : SysTime;
+
 import dpq.connection;
+import dpq.value;
+import dpq.attributes;
+import dpq.query;
+import dpq.result;
 
 void main()
 {
@@ -52,12 +58,18 @@ void main()
 		 Basic querying can be done via the Query object which allows you
 		 two write manual queries.
 
-		 The basic constructor accepts a Connection object, an optional SQL command,
-		 and any number of parameters to be sent, also optional.
+		 The basic constructor accepts a Connection object, an optional SQL command.
 
 		 Params are positional and begin with $1, any number of params can be sent.
 	 */
-	Query q = Query(db, "SELECT $1", 1);
+	Query q = Query(db, "SELECT $1, $2, $3");
+
+	/*
+		 Parameters to the query can be added with the addParam method, or
+		 the `<<` operator, which can also be chained.
+	 */
+	q.addParam(1);
+	q << 2.0 << "three";
 
 	/*
 		 Running the query is done with the querys' run() function, which
@@ -79,8 +91,10 @@ void main()
 
 		 Alternatively, you can also loop through all the Result's rows with a
 		 foreach loop.
+
+		 Row, is however not publicly-visible, so use the auto declarator.
 	 */
-	Row firstRow = r[0];
+	auto firstRow = r[0];
 
 	foreach (row; r)
 	{
@@ -104,7 +118,7 @@ void main()
 			 type will ALWAYS be an instance of Nullable, meaning you must check for 
 			 the NULL value unless you're sure it cannot happen.
 		 */
-		string stringParam = str.as!string;
+		string stringParam = strVal.as!string;
 
 		/*
 			 In actual code, you will probably want to shorten this and use
@@ -119,7 +133,7 @@ void main()
 
 			 Because of that, is is usually recommended to do stuff this way.
 		 */
-		auto literalString = row[3].as!string;
+		auto literalString = row[2].as!string;
 
 		/* 
 			 And now the returned value can be checked for null with Nullable's
@@ -130,6 +144,18 @@ void main()
 	}
 
 	/*
+		 Since @relation is not specified here, user_profile_data will be used.
+	 */
+	struct UserProfileData
+	{
+		string fullName;
+		/*
+			 Nullable values are supported at any level of nesting and work as expected.
+		 */
+		Nullable!string favouriteQuote;
+	}
+
+		/*
 		 That's it as far as the basic Querying goes, but that's not where the
 		 real power of dpq comes from.
 
@@ -169,7 +195,7 @@ void main()
 			 unique index.
 		 */
 		@index int posts;
-		@uniqueIndex string username
+		@uniqueIndex string username;
 		
 
 		/*
@@ -197,6 +223,7 @@ void main()
 			 These structures will either be created as a custom type in the database,
 			 or if applicable, relations.
 		 */
+
 		UserProfileData profileData;
 
 		/*
@@ -220,19 +247,6 @@ void main()
 
 	}
 
-	/*
-		 Since @relation is not specified here, user_profile_data will be used.
-	 */
-	struct UserProfileData
-	{
-		string fullName;
-		/*
-			 I am seriously running out of example fields for User here.
-
-			 Nullable values are supported at any level of nesting and work as expected.
-		 */
-		Nullable!string favouriteQuote;
-	}
 
 	@relation("posts")
 	struct Post
@@ -253,7 +267,7 @@ void main()
 			 Additionally, alongside the FK constraint on a FK column, an index
 			 will also be created for it, since that's generally good practice.
 		 */
-		@FK!User userId;
+		@FK!User int userId;
 	}
 
 	/*
@@ -290,7 +304,7 @@ void main()
 
 		auto user = db.findOne!User(1);
 		if (!user.isNull)
-			// magic
+			writeln("We have a user."); // whatever logic
 
 		/*
 			 There's also a special version of findOne, allowing you to specify a
@@ -320,7 +334,7 @@ void main()
 			 This method will return an array, which will be empty if no records
 			 matching the filter were found.
 		 */
-		User[] manyUsers = fb.find!User("posts > $1", 250);
+		User[] manyUsers = db.find!User("posts > $1", 250);
 
 		/*
 			 Inserting records is just as simple, using the Connection's insert method.
@@ -361,8 +375,8 @@ void main()
 			 It sets the columns of the provided to the values they map to.
 			 
 			 Keep in mind that there is no way to set values relatively to their
-			 current value using this way, so it might not be very appropriate if
-			 multiple instances of the program connect to the same database.
+			 current value using this way, which might cause data races in concurrent
+			 applications.
 		 */
 		nUpdated = db.update!User(1, [
 				"posts": Value(3),
@@ -388,15 +402,15 @@ void main()
 			 More info is available in the Connection's and Query's files inline docs.
 		 */
 		db.removeAsync!User(1);
-
-		/*
-			 I believe this covers most use cases for dpq.
-
-			 If you have any questions, I can be contacted on Twitter with the handle
-			 @IrenejMarc. I'll always be glad to help out.
-
-			 If you have any ideas how dpq could be improved, or find a missing feature
-			 or a bug, don't be scared to create an issue, I love feedback.
-		 */
 }
 ```
+
+## A word from the author
+I believe this above example covers most use cases for dpq.
+
+If you have any questions, I can be contacted on Twitter with the handle
+@IrenejMarc. I'll always be glad to help out.
+
+If you have any ideas how dpq could be improved, or find a missing feature
+or a bug, don't be scared to create an issue, I love feedback.
+
