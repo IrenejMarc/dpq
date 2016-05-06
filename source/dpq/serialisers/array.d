@@ -250,7 +250,8 @@ struct ArraySerialiser
 	// Arrays are always created implicitly
 	static void ensureExistence(T)(Connection c)
 	{
-		return;
+		alias EType = BaseType!T;
+		SerialiserFor!EType.ensureExistence!EType(c);
 	}
 
 	static void addCustomOid(Oid typeOid, Oid oid)

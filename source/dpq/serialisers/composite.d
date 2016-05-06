@@ -136,6 +136,9 @@ struct CompositeTypeSerialiser
 		alias members = serialisableMembers!T;
 
 		string typeName = SerialiserFor!T.nameForType!T;
+		if ((typeName in _customOids) != null)
+			return;
+
 		string escTypeName = conn.escapeIdentifier(typeName);
 
 		string[] columns;
