@@ -180,23 +180,13 @@ struct Value
 		return _valueBytes.ptr;
 	}
 
-	T as(T)()
-		if (isInstanceOf!(Nullable, T))
+	auto as(T)()
 	{
-		alias RT = ReturnType!(T.get);
-		return as!(Unqual!RT);
-	}
-
-	Nullable!T as(T)()
-		if (!isInstanceOf!(Nullable, T))
-	{
-		alias RT = Unqual!T;
-
 		if (_isNull)
-			return Nullable!RT.init;
+			return Nullable!(NoNullable!T).init;
 
 		ubyte[] data = _valueBytes[0 .. _size];
-		return fromBytes!RT(data, _size);
+		return fromBytes!T(data, _size);
 	}
 
 	unittest
@@ -210,6 +200,7 @@ struct Value
 
 		v = 123;
 		assert(v.as!int == 123);
+		assert(v.as!(Nullable!int) == 123);
 
 		v = [[1, 2], [3, 4]];
 		assert(v.as!(int[][]) == [[1, 2], [3, 4]]);
