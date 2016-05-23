@@ -392,11 +392,12 @@ struct Connection
 			string attr = escAttrName ~ " " ~ attrType;
 
 			// A type must be created before using it.
-			// This could be implemented using serialisers ...
 			serialiser.ensureExistence!MType(this);
 
+			// Take care of primary keys
 			static if (hasUDA!(mixin(member), PrimaryKeyAttribute))
 				attr ~= " PRIMARY KEY";
+			// And foreign key
 			else static if (hasUDA!(mixin(member), ForeignKeyAttribute))
 			{
 				enum uda = getUDAs!(mixin(member), ForeignKeyAttribute)[0];
@@ -425,6 +426,13 @@ struct Connection
 						escapeIdentifier("%s_%s_fk_index".format(relName, attrName)),
 						escRelName,
 						escAttrName);
+			}
+
+			// Custom suffixes
+			static if (hasUDA!(mixin(member), ColumnSuffixAttribute))
+			{
+				enum suffix = getUDAs!(mixin(member), ColumnSuffixAttribute)[0].suffix;
+				attr ~= " " ~ suffix;
 			}
 
 			columns ~= attr;

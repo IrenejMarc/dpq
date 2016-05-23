@@ -88,6 +88,40 @@ package struct PGTypeAttribute
 }
 
 /**
+	Allows placing any text after the column definition when ensureSchema is ran.
+
+	Useful for stuff like "NOT NULL", or "CHECK (x > y)", ...
+
+	Do not use to create foreign keys, use @FK instead.
+
+	Example:
+	-------------
+	@relation("testy")
+	struct Test
+	{
+		@serial @PK int id;
+		@suffix("NOT NULL") string username; // will produce "username TEXT NOT NULL"
+	}
+	-------------
+ */
+ColumnSuffixAttribute suffix(string suffix)
+{
+	return ColumnSuffixAttribute(suffix);
+}
+
+struct ColumnSuffixAttribute
+{
+	string suffix;
+}
+
+/**
+	A shortcut to @suffix("NOT NULL")
+
+	Does not perform any kind of a null check in D.
+ */
+enum notNull = suffix("NOT NULL");
+
+/**
 	Specifies that the member should be completely ignored as far as the DB is
 	concerned.
  */
