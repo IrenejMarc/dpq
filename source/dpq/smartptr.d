@@ -1,3 +1,4 @@
+///
 module dpq.smartptr;
 
 import dpq.exception;

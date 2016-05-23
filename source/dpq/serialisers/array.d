@@ -1,3 +1,4 @@
+///
 module dpq.serialisers.array;
 
 import std.typecons : Nullable;
@@ -41,8 +42,9 @@ import libpq.libpq;
 	ndim         | 4               | more than 0, less than MAXDIM
 	data_offset  | 4               | data offset in bytes, if > 0, reads null bitmap
 	element_type | sizeof Oid      | cannot be spec_element_type, whatever that is
+	------------------------------------
 
-  --- ndim times
+    --- ndim times
 	dim          | 4               | appends to array of dim -- if lbound + dim - 1 < lbound, fail (???)
 	lBound       | 4               | appends to array of lBound
 	---

@@ -1,3 +1,4 @@
+///
 module dpq.serialisers.scalar;
 
 import std.traits;

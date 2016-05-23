@@ -1,3 +1,4 @@
+///
 module dpq.result;
 
 import std.conv : to;
