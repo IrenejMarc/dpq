@@ -1,3 +1,4 @@
+///
 module dpq.serialisers.bytea;
 
 import libpq.libpq : Oid;

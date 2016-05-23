@@ -1,3 +1,4 @@
+///
 module dpq.querybuilder;
 
 import dpq.value;

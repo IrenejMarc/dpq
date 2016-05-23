@@ -1,3 +1,4 @@
+///
 module dpq.meta;
 
 import dpq.attributes;
@@ -83,7 +84,7 @@ template NoNullable(T)
 	all just compile-time.
 
 	Examples:
-		static assert(RealType!(const Nullable!(immutable int) == int);
+		static assert(RealType!(const Nullable!(immutable int) == int));
  */
 template RealType(T)
 {

@@ -1,3 +1,4 @@
+///
 module dpq.query;
 
 import dpq.connection;
@@ -47,7 +48,7 @@ struct Query
 		Examples:
 		---------------
 		auto q = Query("SELECT 1::INT");
-		---------------
+
 		auto q = Query("SELECT $1::INT", 1);
 		---------------
 	 */
@@ -69,7 +70,7 @@ struct Query
 		---------------
 		Connection conn; // an established connection
 		auto q = Query(conn, "SELECT 1::INT");
-		---------------
+
 		Connection conn; // an established connection
 		auto q = Query(conn, "SELECT $1::INT", 1);
 		---------------
