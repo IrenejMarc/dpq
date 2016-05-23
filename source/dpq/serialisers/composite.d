@@ -1,3 +1,4 @@
+///
 module dpq.serialisers.composite;
 
 import dpq.serialisation;
