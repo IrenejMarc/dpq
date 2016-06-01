@@ -223,7 +223,12 @@ struct ArraySerialiser
 			}
 		}
 
-		return assemble!T;
+		// Dimensions are 0 if array is completely empty.
+		if (nDims > 0)
+			return assemble!T;
+
+		T arr;
+		return arr;
 	}
 
 	static Oid oidForType(T)()
