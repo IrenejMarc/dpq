@@ -203,6 +203,8 @@ template typeOid(T)
 				enum typeOid = Type.INT2ARRAY;
 			else static if (is(BT == float))
 				enum typeOid = Type.FLOAT4ARRAY;
+			else static if (is(BT == string))
+				enum typeOid = Type.TEXTARRAY;			
 			else static if (is(BT == byte) || is (BT == ubyte))
 				enum typeOid = Type.BYTEA;
 			else
