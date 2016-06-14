@@ -383,4 +383,5 @@ static this()
 	arrayOIDs[Type.INT8]   = Type.INT8ARRAY;
 	arrayOIDs[Type.INT2]   = Type.INT2ARRAY;
 	arrayOIDs[Type.FLOAT4] = Type.FLOAT4ARRAY;
+	arrayOIDs[Type.TEXT] = Type.TEXTARRAY;
 }
