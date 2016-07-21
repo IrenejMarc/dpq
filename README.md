@@ -343,7 +343,7 @@ void main()
 			 them, allowing you to use PostgreSQL's SERIAL type's default values.
 		 */
 		User newUser;
-		user.username = "Person8164";
+		newUser.username = "Person8164";
 		db.insert(newUser);
 
 		/*
