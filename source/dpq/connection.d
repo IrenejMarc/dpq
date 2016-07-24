@@ -405,7 +405,7 @@ struct Connection
 
 				// Create the FK
 				additionalQueries ~= 
-					`ALTER TABLE %s ADD CONSTRAINT "%s" FOREIGN KEY(%s) REFERENCES %s (%s)`.format(
+					`ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY(%s) REFERENCES %s (%s)`.format(
 							escRelName,
 							escapeIdentifier("%s_%s_fk_%s".format(relName, attrName, uda.relation)),
 							escAttrName,
@@ -423,7 +423,7 @@ struct Connection
 				enum uda = getUDAs!(mixin(member), IndexAttribute)[0];
 
 				additionalQueries ~= "CREATE%sINDEX %s ON %s (%s)".format(
-						uda.unique ? " UNIQUE " : "", 
+						uda.unique ? " UNIQUE " : " ",
 						escapeIdentifier("%s_%s_fk_index".format(relName, attrName)),
 						escRelName,
 						escAttrName);
