@@ -423,7 +423,7 @@ struct Connection
 				enum uda = getUDAs!(mixin(member), IndexAttribute)[0];
 
 				additionalQueries ~= "CREATE%sINDEX %s ON %s (%s)".format(
-						uda.unique ? " UNIQUE " : "", 
+						uda.unique ? " UNIQUE " : " ",
 						escapeIdentifier("%s_%s_fk_index".format(relName, attrName)),
 						escRelName,
 						escAttrName);
