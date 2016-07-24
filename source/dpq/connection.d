@@ -405,7 +405,7 @@ struct Connection
 
 				// Create the FK
 				additionalQueries ~= 
-					`ALTER TABLE %s ADD CONSTRAINT "%s" FOREIGN KEY(%s) REFERENCES %s (%s)`.format(
+					`ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY(%s) REFERENCES %s (%s)`.format(
 							escRelName,
 							escapeIdentifier("%s_%s_fk_%s".format(relName, attrName, uda.relation)),
 							escAttrName,
