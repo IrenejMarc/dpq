@@ -612,7 +612,7 @@ struct Connection
 		QueryBuilder qb;
 		qb.select(members)
 			.from(relationName!T)
-			.where(col, val)
+			.where([col: val])
 			.limit(1);
 
 		auto q = qb.query(this);
@@ -842,7 +842,7 @@ struct Connection
 
 		qb.update(relationName!T)
 			.set(updates)
-			.where(primaryKeyAttributeName!T, id);
+			.where([primaryKeyAttributeName!T: id]);
 
 		auto q = qb.query(this);
 
@@ -907,7 +907,7 @@ struct Connection
 		QueryBuilder qb;
 
 		qb.update(relationName!T)
-			.where(primaryKeyAttributeName!T, id);
+			.where([primaryKeyAttributeName!T: id]);
 
 		foreach (m; serialisableMembers!T)
 			qb.set(attributeName!(mixin("T." ~ m)), __traits(getMember, updates, m));
@@ -1099,7 +1099,7 @@ struct Connection
 	{
 		QueryBuilder qb;
 		qb.remove!T
-			.where(primaryKeyAttributeName!T, id);
+			.where([primaryKeyAttributeName!T: id]);
 
 		return qb.query(this).run().rows;
 	}
@@ -1109,7 +1109,7 @@ struct Connection
 	{
 		QueryBuilder qb;
 		qb.remove!T
-			.where(primaryKeyAttributeName!T, id);
+			.where([primaryKeyAttributeName!T: id]);
 
 		return qb.query(this).runAsync() == 1;
 	}

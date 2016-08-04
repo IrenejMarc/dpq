@@ -10,7 +10,8 @@ import dpq.column;
 import std.typecons;
 import std.string;
 
-import std.algorithm : map;
+import std.algorithm : map, sum;
+import std.conv : to;
 
 version (unittest) import std.stdio;
 
@@ -26,6 +27,49 @@ private enum QueryType
 	update = "UPDATE",
 	insert = "INSERT",
 	delete_ = "DELETE"
+}
+
+/**
+	A filter builder struct meant for internal usage.
+
+	Simplifies building a combination of AND/OR filters and makes the code more
+	readable.
+ */
+private struct FilterBuilder
+{
+	private string[][] _filters;
+
+	ref FilterBuilder and(string filter)
+	{
+		if (_filters.length == 0)
+			_filters.length++;
+
+		_filters[$ - 1] ~= '(' ~ filter ~ ')';
+
+		return this;
+	}
+
+	ref FilterBuilder or()
+	{
+		_filters ~= [];
+
+		return this;
+	}
+
+	/// Returns the actual number of lowest-level filters
+	long length()
+	{
+		return _filters.map!"a.length".sum;
+	}
+
+
+	string toString()
+	{
+		// Join inner filters by AND, outer by OR
+		return _filters.map!(innerFilter =>
+				innerFilter.join(" AND ")
+				).join(" OR ");
+	}
 }
 
 /**
@@ -55,27 +99,52 @@ struct QueryBuilder
 {
 	private
 	{
+		// Columns to select
 		string[] _columns;
-		string _table;
-		string _filter;
 
+		// Table to select from
+		string _table;
+
+		// A list of filters, lowest-level representing AND, and OR between those
+		FilterBuilder _filters;
+
+		// List of ORDER BY columns and list of orders (ASC/DESC)
 		string[] _orderBy;
 		Order[] _orders;
 
-		int _limit = -1;
+		// Limit and offset values, using -1 is null value (not set)
+		Nullable!(int, -1) _limit = -1;
+		Nullable!(int, -1) _offset = -1;
 
-		Nullable!int _offset;
+		// Params to be used in the filters
 		Value[string] _params;
+
+		// Params to be be used as positional
 		Value[] _indexParams;
 
+		// Columns to list in RETURNING
 		string[] _returning;
 
 		// UPDATE's SET
 		string[] _set;
 
+		// Current index for positional params, needed because we allow mixing
+		// placeholders and positional params
 		int _paramIndex = 0;
+
+		// Type of the query, (SELECT, UPDATE, ...)
 		QueryType _type;
+
 		Connection* _connection;
+	}
+
+	private string escapeIdentifier(string identifier)
+	{
+		if (_connection != null)
+			return _connection.escapeIdentifier(identifier);
+
+		// This could potentionally be dangerous, I don't like it.
+		return `"%s"`.format(identifier);
 	}
 
 	/**
@@ -140,6 +209,23 @@ struct QueryBuilder
 		return this;
 	}
 
+	/**
+		Selects all the given relation's properties
+
+		Examples:
+		-----------------
+		struct User { @PK @serial int id; }
+		auto qb = QueryBuilder()
+				.select!User
+				.where( ... );
+		-----------------
+
+	 */
+	ref QueryBuilder select(T)()
+	{
+		return select(AttributeList!T);
+	}
+
 	unittest
 	{
 		writeln("\t * select");
@@ -189,27 +275,42 @@ struct QueryBuilder
 		assert(qb._table == "test");
 	}
 
-	/**
-		Sets the filter string. Placeholders can be used with this, and even
-		positional params, since the order is predictable. Read addParam for
-		more information about that.
-
-		Calling .where again OVERWRITES the previous filter.
-	 */
-	ref QueryBuilder where(string filter)
+	private void addFilter(string filter)
 	{
-		_filter = filter;
-		return this;
 	}
 
 	/**
-		Same as above, but a shortcut for filtering by one specific column.
-		Calling it again will overwrite both the param and the filter.
+		Adds new filter(s). Param placeholders are used, with the same names as
+		the AA keys. Calling this multiple times will AND the filters.
 	 */
-	ref QueryBuilder where(T)(string col, T val)
+	ref QueryBuilder where(T)(T[string] filters)
 	{
-		_params["__where_filt"] = Value(val);
-		_filter = "%s = {__where_filt}".format(col);
+		foreach (key, value; filters)
+		{
+			_filters.and("%s = {%s}".format(escapeIdentifier(key), key));
+			_params[key] = value;
+		}
+
+		return this;
+	}
+
+	/// Alias and to where, to allow stuff like User.where( ... ).and( ... )
+	alias and = where;
+
+	/**
+		Adds a new filter.
+
+		Placeholders can be used with this, and even
+		positional params, since the order is predictable. Read addParam for
+		more information about that.
+	 */
+	ref QueryBuilder where(T...)(string filter, T params)
+	{
+		writeln("Where called with " ~ filter);
+		_filters.and("%s".format(filter));
+
+		foreach (param; params)
+			_indexParams ~= Value(param);
 
 		return this;
 	}
@@ -218,14 +319,13 @@ struct QueryBuilder
 	{
 		writeln("\t\t * where");
 
-		string str = "a = $1 AND b = $2";
-		QueryBuilder qb;
-		qb.where(str);
-		assert(qb._filter == str);
+		auto qb = QueryBuilder();
 
-		qb.where("some_field", 1);
-		assert(qb._filter == "some_field = {__where_filt}");
-		assert(qb._params["__where_filt"] == Value(1));
+		qb.where(["something": "asd"]);
+		assert(qb._filters.length == 1);
+
+		qb.where(["two": 2, "three": 3]);
+		assert(qb._filters.length == 3);
 	}
 
 	/**
@@ -525,12 +625,15 @@ struct QueryBuilder
 		if (_columns.length == 0)
 			cols = "*";
 		else
-			cols = _columns.join(", ");
+			cols = _columns
+				.map!(c => escapeIdentifier(c))
+				.join(", ");
 
-		string str = "SELECT %s FROM \"%s\"".format(cols, _table);
+		string table = escapeIdentifier(_table);
+		string str = "SELECT %s FROM %s".format(cols, table);
 
-		if (_filter.length > 0)
-			str ~= " WHERE " ~ _filter;
+		if (_filters.length > 0)
+			str ~= " WHERE " ~ _filters.to!string;
 
 		if (_orderBy.length > 0)
 		{
@@ -540,7 +643,7 @@ struct QueryBuilder
 			str = str[0 .. $ - 2];
 		}
 
-		if (_limit != -1)
+		if (!_limit.isNull)
 			str ~= " LIMIT %d".format(_limit);
 
 		if (!_offset.isNull)
@@ -556,12 +659,12 @@ struct QueryBuilder
 		QueryBuilder qb;
 		qb.select("col")
 			.from("table")
-			.where("id", 1)
+			.where(["id": 1])
 			.limit(1)
 			.offset(1);
 
 		string str = qb.command();
-		assert(str == `SELECT col FROM "table" WHERE id = $1 LIMIT 1 OFFSET 1`, str);
+		assert(str == `SELECT "col" FROM "table" WHERE ("id" = $1) LIMIT 1 OFFSET 1`, str);
 	}
 
 	private string insertCommand()
@@ -601,8 +704,8 @@ struct QueryBuilder
 				_table,
 				_set.join(", "));
 
-		if (_filter.length > 0)
-			str ~= " WHERE " ~ _filter;
+		if (_filters.length > 0)
+			str ~= " WHERE " ~ _filters.to!string;
 
 		if (_returning.length > 0)
 		{
@@ -620,21 +723,21 @@ struct QueryBuilder
 		QueryBuilder qb;
 		qb.update("table")
 			.set("col", 1)
-			.where("foo", 2)
+			.where(["foo": 2])
 			.returning("id");
 
 		string str = qb.command();
 		assert(
-				str == `UPDATE "table" SET "col" = $1 WHERE foo = $2 RETURNING id` ||
-				str == `UPDATE "table" SET "col" = $2 WHERE foo = $1 RETURNING id`);
+				str == `UPDATE "table" SET "col" = $1 WHERE ("foo" = $2) RETURNING id` ||
+				str == `UPDATE "table" SET "col" = $2 WHERE ("foo" = $1) RETURNING id`);
 	}
 
 	private string deleteCommand()
 	{
 		string str = "DELETE FROM \"%s\"".format(_table);
 
-		if (_filter.length > 0)
-			str ~= " WHERE " ~ _filter;
+		if (_filters.length > 0)
+			str ~= " WHERE " ~ _filters.to!string;
 
 		if (_returning.length > 0)
 		{
@@ -651,11 +754,11 @@ struct QueryBuilder
 
 		QueryBuilder qb;
 		qb.remove("table")
-			.where("id", 1)
+			.where(["id": 1])
 			.returning("id");
 
 		string str = qb.command();
-		assert(str == `DELETE FROM "table" WHERE id = $1 RETURNING id`, str);
+		assert(str == `DELETE FROM "table" WHERE ("id" = $1) RETURNING id`, str);
 	}
 
 	@property string command()
