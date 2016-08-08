@@ -536,10 +536,8 @@ template isRWField(T, string M)
 		__traits(getMember, t, M) = __traits(getMember, t, M);
 	}
 
-	alias MF = TypeTuple!(__traits(getMember, T, M));
-
 	// reject type aliases
-	static if (is(MF))
+	static if (is(TypeTuple!(__traits(getMember, T, M))))
 		enum isRWField = false;
 	// reject non-public members
 	else static if (!isPublicMember!(T, M))
