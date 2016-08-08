@@ -17,6 +17,7 @@ version (unittest) import std.stdio;
 
 enum Order : string
 {
+	none = "",
 	asc = "ASC",
 	desc = "DESC"
 };
@@ -138,6 +139,12 @@ struct QueryBuilder
 		Connection* _connection;
 	}
 
+	@property QueryBuilder dup()
+	{
+		// It's a struct, I'll copy anyway
+		return this;
+	}
+
 	private string escapeIdentifier(string identifier)
 	{
 		if (_connection != null)
@@ -217,6 +224,7 @@ struct QueryBuilder
 		struct User { @PK @serial int id; }
 		auto qb = QueryBuilder()
 				.select!User
+				.from!User
 				.where( ... );
 		-----------------
 
@@ -275,21 +283,62 @@ struct QueryBuilder
 		assert(qb._table == "test");
 	}
 
-	private void addFilter(string filter)
+	/**
+		Generates a placeholder that should be unique every time.
+
+		This is required because we might filter by the same column twice (e.g. 
+		where(["id": 1])).or.where(["id": 2]), in which case the second value for
+		ID would overwrite the first one.
+	 */
+	private string safePlaceholder(string key)
 	{
+		/*
+			Because we only really need to be unique within this specific QB, just
+			a simple static counter is good enough. It could be put on the QB
+			instance instead, but this works just as well no need to complicate for
+			now.
+		 */
+		static int count = 0;
+		return "%s_%d".format(key, ++count);
 	}
 
 	/**
 		Adds new filter(s). Param placeholders are used, with the same names as
 		the AA keys. Calling this multiple times will AND the filters.
+
+		Internally, a value placeholder will be used for each of the values, with
+		the same name as the column itself. Be careful not to overwrite these
+		before running the query.
 	 */
 	ref QueryBuilder where(T)(T[string] filters)
 	{
 		foreach (key, value; filters)
 		{
-			_filters.and("%s = {%s}".format(escapeIdentifier(key), key));
-			_params[key] = value;
+			auto placeholder = safePlaceholder(key);
+			_filters.and("%s = {%s}".format(escapeIdentifier(key), placeholder));
+			_params[placeholder] = value;
 		}
+
+		return this;
+	}
+
+	/**
+		Adds a new custom filter.
+
+		Useful for filters that are not simple equality comparisons, or usage psql
+		functions. Nothing is escaped, make sure you properly escape the reserved
+		keywords if they are used as identifier names.
+
+		Placeholders can be used with this, and even
+		positional params, since the order is predictable. Read addParam for
+		more information about that.
+	 */
+	ref QueryBuilder where(T...)(string filter, T params)
+	{
+		_filters.and("%s".format(filter));
+
+		foreach (param; params)
+			_indexParams ~= Value(param);
 
 		return this;
 	}
@@ -298,22 +347,28 @@ struct QueryBuilder
 	alias and = where;
 
 	/**
-		Adds a new filter.
+		Once called, all additional parameters will be placed into their own group,
+		OR placed between each group of ANDs
 
-		Placeholders can be used with this, and even
-		positional params, since the order is predictable. Read addParam for
-		more information about that.
+		Examples:
+		--------------------
+		auto qb = QueryBuilder()
+			.select!User
+			.from!User
+			.where(["id	": 1])
+			.or
+			.where(["id": 2]);
+
+			// Which will produce a filter like "... WHERE (id = $1) OR (id = $2)"
+		--------------------
 	 */
-	ref QueryBuilder where(T...)(string filter, T params)
+	ref @property QueryBuilder or()
 	{
-		writeln("Where called with " ~ filter);
-		_filters.and("%s".format(filter));
-
-		foreach (param; params)
-			_indexParams ~= Value(param);
+		_filters.or();
 
 		return this;
 	}
+
 
 	unittest
 	{
@@ -421,7 +476,7 @@ struct QueryBuilder
 		assert(qb._table == relationName!Test);
 	}
 
-	ref QueryBuilder set(Value[string] params)
+	ref QueryBuilder set(T)(T[string] params)
 	{
 		foreach (col, val; params)
 			set(col, val);
@@ -434,7 +489,7 @@ struct QueryBuilder
 		assert(_type == QueryType.update, "QueryBuilder.set() can only be used on UPDATE queries");
 
 		_params[col] = val;
-		_set ~= "\"%s\" = {%s}".format(col, col);
+		_set ~= "%s = {%s}".format(escapeIdentifier(col), col);
 
 		return this;
 	}
@@ -591,6 +646,28 @@ struct QueryBuilder
 		return this;
 	}
 
+	ref QueryBuilder addValues(T, U)(U val)
+	{
+		import std.traits;
+		import dpq.meta;
+		import dpq.serialisation;
+
+		if (isAnyNull(val))
+			addValue(null);
+		else
+		{
+			foreach (m; serialisableMembers!(NoNullable!T))
+			{
+				static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
+					continue;
+				else
+					addValue(__traits(getMember, val, m));
+			}
+		}
+
+		return this;
+	}
+
 	// Other stuff
 
 	private string replaceParams(string str)
@@ -639,7 +716,12 @@ struct QueryBuilder
 		{
 			str ~= " ORDER BY ";
 			for (int i = 0; i < _orderBy.length; ++i)
+			{
+				if (_orders[i] == Order.none)
+					continue;
+
 				str ~= "\"" ~ _orderBy[i] ~ "\" " ~ _orders[i] ~ ", ";
+			}
 			str = str[0 .. $ - 2];
 		}
 
@@ -866,10 +948,4 @@ struct QueryBuilder
 	{
 		return Query(conn, command, paramsArr);
 	}
-	
-}
-
-void param(alias P)(QueryBuilder b)
-{
-	b[P.stringof] = P;
 }

@@ -963,22 +963,6 @@ struct Connection
 		c.exec("DROP TABLE update_object_test");
 	}
 
-	private void addVals(T, U)(ref QueryBuilder qb, U val)
-	{
-		if (isAnyNull(val))
-			qb.addValue(null);
-		else
-		{
-			foreach (m; serialisableMembers!(NoNullable!T))
-			{
-				static if (isPK!(T, m) || hasUDA!(mixin("T." ~ m), IgnoreAttribute))
-					continue;
-				else
-					qb.addValue(__traits(getMember, val, m));
-			}
-		}
-	}
-
 	/**
 		Inserts the given structure, returning whatever columns are specified by the
 		second param as a normal Result.
@@ -1000,7 +984,7 @@ struct Connection
 		if (ret.length > 0)
 			qb.returning(ret);
 
-		addVals!T(qb, val);
+		qb.addValues!T(val);
 
 		return qb.query(this).run();
 	}
@@ -1021,7 +1005,7 @@ struct Connection
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
 
-		addVals!T(qb, val);
+		qb.addValues!T(val);
 
 		if (async)
 			return qb.query(this).runAsync();
