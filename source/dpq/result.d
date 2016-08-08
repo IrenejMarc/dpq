@@ -202,6 +202,34 @@ struct Result
 		assert(r.columnName(2) == "col3");
 	}
 
+	/**
+		Make result satisfy the IsInputRange constraints so we can use it
+		with functions like map, each, ...
+
+		Kinda hackish for now.
+	 */
+	int currentRangeIndex = 0;
+	@property bool empty()
+	{
+		return currentRangeIndex >= this.rows - 1;
+	}
+
+	void popFront()
+	{
+		++currentRangeIndex;
+	}
+
+	@property Row front()
+	{
+		return Row(currentRangeIndex, this);
+	}
+
+	/**
+		Support foreach loops, the first version with just the row, and the
+		second also providing the index of the row.
+
+		Row is not sent as a reference.
+	 */
 	int opApply(int delegate(Row) dg)
 	{
 		int result = 0;
