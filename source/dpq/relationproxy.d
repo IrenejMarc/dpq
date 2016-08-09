@@ -57,7 +57,9 @@ struct RelationProxy(T)
 {
 	private 
 	{
-		/// The actual content, if any at all.
+		/**
+			The actual content, if any at all.
+		 */
 		T[] _content;
 
 		Connection _connection;
@@ -86,13 +88,17 @@ struct RelationProxy(T)
 			_markFresh();
 		}
 
-		/// Mark the content stale, meaning it will be reloaded when next needed
+		/**
+			Mark the content stale, meaning it will be reloaded when next needed.
+		 */
 		void _markStale()
 		{
 			_contentFresh = false;
 		}
 
-		/// Mark the content fresh, it should not be reloaded unless filters change
+		/**
+			Mark the content fresh, it should not be reloaded unless filters change.
+		 */
 		void _markFresh()
 		{
 			_contentFresh = true;
