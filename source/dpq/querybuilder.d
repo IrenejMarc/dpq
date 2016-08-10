@@ -703,7 +703,7 @@ struct QueryBuilder
 			cols = "*";
 		else
 			cols = _columns
-				.map!(c => escapeIdentifier(c))
+				//.map!(c => escapeIdentifier(c))
 				.join(", ");
 
 		string table = escapeIdentifier(_table);

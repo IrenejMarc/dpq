@@ -3,10 +3,12 @@ module dpq.relationproxy;
 import dpq.attributes;
 import dpq.connection;
 import dpq.querybuilder;
-import std.array;
+import dpq.value : Value;
 
-import std.typecons : Nullable;
 import std.algorithm : map;
+import std.array;
+import std.meta : Alias;
+import std.typecons : Nullable;
 
 /**
 	 Verifies that the given type can be used a relation
@@ -227,7 +229,7 @@ struct RelationProxy(T)
 
 		// Make a copy of the builder, as to not ruin the query in case of reuse
 		auto qb = _queryBuilder;
-		qb.limit(1).order(primaryKeyName!T, Order.asc);
+		qb.limit(1).order(primaryKeyAttributeName!T, Order.asc);
 
 		auto result = qb.query(_connection).run();
 
@@ -242,7 +244,7 @@ struct RelationProxy(T)
 
 		Caching acts the same as with first.
 	 */
-	@property Nullable!T last(string by = primaryKeyName!T)
+	@property Nullable!T last(string by = primaryKeyAttributeName!T)
 	{
 		alias RT = Nullable!T;
 
@@ -256,7 +258,7 @@ struct RelationProxy(T)
 
 		// Make a copy of the builder, as to not ruin the query in case of reuse
 		auto qb = _queryBuilder;
-		qb.limit(1).order(primaryKeyName!T, Order.desc);
+		qb.limit(1).order(primaryKeyAttributeName!T, Order.desc);
 
 		auto result = qb.query(_connection).run();
 
@@ -310,6 +312,18 @@ struct RelationProxy(T)
 		return result.rows;
 	}
 
+	auto update(U, Tpk)(Tpk id, U[string] values)
+	{
+		_markStale();
+
+		auto qb = QueryBuilder()
+			.update!T
+			.set(values)
+			.where([primaryKeyAttributeName!T: Value(id)]);
+
+		return qb.query(_connection).run().rows;
+	}
+
 	/**
 		Simply deletes all the records matching the filters.
 
@@ -327,6 +341,19 @@ struct RelationProxy(T)
 		return result.rows;
 	}
 
+	auto remove(Tpk)(Tpk id)
+	{
+		_markStale();
+
+		auto qb = QueryBuilder()
+			.remove()
+			.from!T
+			.where([primaryKeyAttributeName!T: Value(id)]);
+
+
+		return qb.query(_connection).run().rows;
+	}
+
 	/**
 		Inserts a new record, takes the record as a reference in order to update
 		its PK value. Does not update any other values.
@@ -337,21 +364,58 @@ struct RelationProxy(T)
 	 */
 	ref T insert(ref T record)
 	{
-		import std.typetuple;
 		_markStale();
 
 		enum pk = primaryKeyName!T;
+		enum pkAttr = primaryKeyAttributeName!T;
 
 		auto qb = QueryBuilder()
 				.insert(relationName!T, AttributeList!(T, true, true))
-				.returning(pk)
+				.returning(pkAttr)
 				.addValues!T(record);
 
-		alias pkMem = TypeTuple!(__traits(getMember, record, pk));
+		alias pkMem = Alias!(__traits(getMember, record, pk));
 		auto result = qb.query(_connection).run();
-		__traits(getMember, record, pk) = result[0][pk].as!(typeof(pkMem));
+		__traits(getMember, record, pk) = result[0][pkAttr].as!(typeof(pkMem));
 
 		return record;
+	}
+
+	bool save(T record)
+	{
+		_markStale();
+
+		enum pkName = primaryKeyName!T;
+
+		auto qb = QueryBuilder()
+			.update(relationName!T)
+			.where([pkName: __traits(getMember, record, pkName)]);
+
+		foreach (member; serialisableMembers!T)
+			qb.set(
+					attributeName!(__traits(getMember, record, member)),
+					__traits(getMember, record, member));
+
+		return qb.query(_connection).run().rows > 0;
+	}
+
+	/**
+		Selects the count of records with current filters.
+		Default is *, but any column can be specified as a parameter. The column
+		name is not further escaped.
+
+		Does not cache the result or use existing data's length. Call .length to 
+		get local data's length.
+	 */
+	long count(string col = "*")
+	{
+		import std.string : format;
+
+		auto qb = _queryBuilder.dup
+			.select("count(%s)".format(col));
+
+		auto result = qb.query(_connection).run();
+		return result[0][0].as!long;
 	}
 
 	/**
@@ -362,4 +426,58 @@ struct RelationProxy(T)
 	{
 		return "<RelationProxy!" ~ T.stringof ~ "::`" ~ _queryBuilder.command ~ "`>";
 	}
+}
+
+
+/*************************************************/
+/* Methods meant to be used on record themselves */
+/*************************************************/
+
+/**
+	Reloads the record from the DB, overwrites it. Returns a reference to the 
+	same object.
+
+	Examples:
+	---------------------
+	User user = User.first;
+	writeln("My user is: ", user);
+	user.update(["username": "Oopdated Ooser"]);
+	writeln("My user is: ", user);
+	writeln("My user from DB is: ", User.find(user.id));
+	writeln("Reloaded user ", user.reload); // will be same as above
+	---------------------
+ */
+ref T reload(T)(ref T record)
+	if (IsValidRelation!T)
+{
+	enum pkName = primaryKeyName!T;
+	record = T.find(__traits(getMember, record, pkName));
+
+	return record;
+}
+
+/**
+	Updates a single record with the new values, does not set them on the record
+	itself.
+ */
+auto update(T, U)(T record, U[string] values)
+	if (IsValidRelation!T)
+{
+	enum pkName = primaryKeyName!T;
+
+	return T.updateOne(__traits(getMember, record, pkName), values);
+}
+
+auto remove(T)(T record)
+	if (IsValidRelation!T)
+{
+	enum pkName = primaryKeyName!T;
+
+	return T.removeOne(__traits(getMember, record, pkName));
+}
+
+bool save(T)(T record)
+	if (IsValidRelation!T)
+{
+	return T.saveRecord(record);
 }

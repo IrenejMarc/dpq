@@ -12,7 +12,7 @@ mixin template RelationMixin()
 	import dpq.connection : _dpqLastConnection;
 	import std.typecons : Nullable;
 
-	@property static relationProxy()
+	@property static ProxyT relationProxy()
 	{
 		return ProxyT(*_dpqLastConnection);
 	}
@@ -54,6 +54,31 @@ mixin template RelationMixin()
 
 	@property static Type[] all()
 	{
-		return RelationProxy!Type(*_dpqLastConnection).all;
+		return relationProxy.all;
+	}
+
+	static auto updateAll(U)(U[string] updates)
+	{
+		return relationProxy.updateAll(updates);
+	}
+
+	static auto updateOne(U, Tpk)(Tpk id, U[string] values)
+	{
+		return relationProxy.update(id, values);
+	}
+
+	static auto removeOne(Tpk)(Tpk id)
+	{
+		return relationProxy.remove(id);
+	}
+	
+	static bool saveRecord(Type record)
+	{
+		return relationProxy.save(record);
+	}
+
+	static long count(string col = "*")
+	{
+		return relationProxy.count(col);
 	}
 }
