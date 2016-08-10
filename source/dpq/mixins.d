@@ -4,6 +4,28 @@ module dpq.mixins;
 import dpq.relationproxy;
 import std.typecons : Nullable;
 
+/**
+	Provides static methods for easy access to RelationProxy for the type
+	this is used in. For docs on all the methods see RelationProxy's own
+	docs.
+
+	Examples:
+	------------------
+	struct User
+	{
+		mixin RelationMixin;
+
+		@PK @serial int id;
+		string username;
+		ubyte[] password;
+		int posts;
+	}
+
+	auto firstUser = User.where(...).first;
+	auto nUpdated = User.where(...).updateAll(["posts": 123]);
+	auto userCount = User.where(...).count;
+	------------------
+ */
 mixin template RelationMixin()
 {
 	alias Type = typeof(this);

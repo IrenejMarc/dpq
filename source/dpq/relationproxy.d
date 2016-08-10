@@ -341,6 +341,9 @@ struct RelationProxy(T)
 		return result.rows;
 	}
 
+	/**
+		Removes a single record, filtering it by the primary key's value.
+	 */
 	auto remove(Tpk)(Tpk id)
 	{
 		_markStale();
@@ -381,6 +384,19 @@ struct RelationProxy(T)
 		return record;
 	}
 
+	/**
+		Updates the given record in the DB with all the current values.
+
+		Updates by ID. Assumes the record is already in the DB. Does not insert
+		under any circumstance.
+
+		Examples:
+		-----------------
+		User user = User.first;
+		user.posts = posts - 2;
+		user.save();
+		-----------------
+	 */
 	bool save(T record)
 	{
 		_markStale();
@@ -429,9 +445,9 @@ struct RelationProxy(T)
 }
 
 
-/*************************************************/
-/* Methods meant to be used on record themselves */
-/*************************************************/
+/**************************************************/
+/* Methods meant to be used on records themselves */
+/**************************************************/
 
 /**
 	Reloads the record from the DB, overwrites it. Returns a reference to the 
@@ -459,6 +475,14 @@ ref T reload(T)(ref T record)
 /**
 	Updates a single record with the new values, does not set them on the record
 	itself.
+
+	Examples:
+	--------------------
+	User user = User.first;
+	user.update(["username": "Some new name"]); // will run an UPDATE query
+	user.reload(); // Can be reloaded after to fetch new data from DB if needed
+	--------------------
+
  */
 auto update(T, U)(T record, U[string] values)
 	if (IsValidRelation!T)
@@ -468,6 +492,9 @@ auto update(T, U)(T record, U[string] values)
 	return T.updateOne(__traits(getMember, record, pkName), values);
 }
 
+/**
+	Removes a record from the DB, filtering by the primary key.
+ */
 auto remove(T)(T record)
 	if (IsValidRelation!T)
 {
@@ -476,6 +503,9 @@ auto remove(T)(T record)
 	return T.removeOne(__traits(getMember, record, pkName));
 }
 
+/**
+	See: RelationProxy's save method
+ */
 bool save(T)(T record)
 	if (IsValidRelation!T)
 {
