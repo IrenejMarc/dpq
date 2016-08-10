@@ -746,7 +746,7 @@ struct QueryBuilder
 			.offset(1);
 
 		string str = qb.command();
-		assert(str == `SELECT "col" FROM "table" WHERE ("id" = $1) LIMIT 1 OFFSET 1`, str);
+		assert(str == `SELECT col FROM "table" WHERE ("id" = $1) LIMIT 1 OFFSET 1`, str);
 	}
 
 	private string insertCommand()
