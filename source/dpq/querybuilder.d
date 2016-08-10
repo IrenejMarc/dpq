@@ -338,7 +338,7 @@ struct QueryBuilder
 		_filters.and("%s".format(filter));
 
 		foreach (param; params)
-			_indexParams ~= Value(param);
+			addParam(param);
 
 		return this;
 	}
