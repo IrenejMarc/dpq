@@ -60,7 +60,7 @@ private struct FilterBuilder
 	/// Returns the actual number of lowest-level filters
 	long length()
 	{
-		return _filters.map!"a.length".sum;
+		return _filters.map!(f => f.length).sum;
 	}
 
 
@@ -362,13 +362,12 @@ struct QueryBuilder
 			// Which will produce a filter like "... WHERE (id = $1) OR (id = $2)"
 		--------------------
 	 */
-	ref @property QueryBuilder or()
+	@property ref QueryBuilder or()
 	{
 		_filters.or();
 
 		return this;
 	}
-
 
 	unittest
 	{
