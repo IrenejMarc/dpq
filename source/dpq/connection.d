@@ -978,6 +978,7 @@ struct Connection
 		-------------------
 	 */
 	Result insertR(T)(T val, string ret = "")
+		if(!isArray!T)
 	{
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
@@ -985,6 +986,40 @@ struct Connection
 			qb.returning(ret);
 
 		qb.addValues!T(val);
+
+		return qb.query(this).run();
+	}
+
+	/**
+		Inserts the given array structures in a singl query, returning whatever columns are specified by the
+		second param as a normal Result.
+
+		Equivalent to specifying RETURNING at the end of the query.
+
+		Examples:
+		-------------------
+		Connection c; // an established connection
+		struct Data { @PK int id, int a; int b; }
+		Data[2] myData;
+		auto result = c.insert(myData, "id");
+		-------------------
+	 */
+	Result insertR(T)(T vals, string ret = "")
+		if(isArray!T)
+	{
+		import std.range.primitives : ElementType;
+		alias ET = ElementType!T;
+
+		if (!vals.length)
+			return Result.init;
+		
+		QueryBuilder qb;
+		qb.insert(relationName!ET, AttributeList!(ET, true, true));
+		if (ret.length > 0)
+			qb.returning(ret);
+
+		foreach (val; vals)
+			qb.addValues!ET(val);
 
 		return qb.query(this).run();
 	}
@@ -1001,6 +1036,7 @@ struct Connection
 		---------------
 	 */
 	bool insert(T)(T val, bool async = false)
+		if(!isArray!T)
 	{
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
@@ -1012,6 +1048,39 @@ struct Connection
 
 		auto r = qb.query(this).run();
 		return r.rows > 0;
+	}
+
+	/**
+		Inserts the given array of structures to the DB as one query
+
+		Examples:
+		---------------
+		Connection c; // An established connection
+		struct User {@PK @serial int id; int a }
+		User[2] myUsers;
+		c.insert(myUsers);
+		---------------
+	 */
+	int insert(T)(T vals, bool async = false)
+		if(isArray!T)
+	{
+		import std.range.primitives : ElementType;
+		alias ET = ElementType!T;
+		
+		QueryBuilder qb;
+		qb.insert(relationName!ET, AttributeList!(ET, true, true));
+
+		if (!vals.length)
+			return 0;
+
+		foreach (val; vals)
+			qb.addValues!ET(val);
+
+		if (async)
+			return qb.query(this).runAsync();
+
+		auto r = qb.query(this).run();
+		return r.rows;
 	}
 
 	unittest
@@ -1047,6 +1116,23 @@ struct Connection
 
 		Test t2 = c.findOneBy!Test("n", 1);
 		assert(t2 == t, t.to!string ~ " != " ~ t2.to!string);
+		
+		Test[] t_arr;
+		t_arr ~= Test.init;
+		t_arr[0].n = 1;
+		t_arr[0].n2 = 2;
+		t_arr[0].foo.bar = 3;
+		t_arr ~= Test.init;
+		t_arr[1].n = 4;
+		t_arr[1].n2 = 5;
+		t_arr[1].foo.bar = 6;
+		
+		auto r3 = c.insert(t_arr);
+		assert(r3 == 2);
+		
+		auto r4 = c.insertR(t_arr, "n");
+		assert(r4[0][0].as!int == t_arr[0].n);
+		assert(r4[1][0].as!int == t_arr[1].n);
 
 		writeln("\t\t * async");
 		t.n = 123;
@@ -1488,41 +1574,40 @@ struct Connection
 
 		Test t;
 		t.t = "before transaction";
-
 		auto r = c.insertR(t, "id");
-		int id = r[0][0].as!int;
+		t.id = r[0][0].as!int;
 
 		c.begin();
 		t.t = "this value is ignored";
-		c.update(id, t);
+		c.update(t.id, t);
 
 		auto s1 = c.savepoint("s1");
 		t.t = "before savepoint s2";
-		c.update(id, t);
+		c.update(t.id, t);
 		
 		auto s2 = c.savepoint("s2");
 		t.t = "after savepoint s2";
-		c.update(id, t);
+		c.update(t.id, t);
 		
-		assert(c.findOne!Test(id).t == "after savepoint s2");
+		assert(c.findOne!Test(t.id).t == "after savepoint s2");
 		
 		c.rollback(s2);
-		assert(c.findOne!Test(id).t == "before savepoint s2");
+		assert(c.findOne!Test(t.id).t == "before savepoint s2");
 		
 		c.rollback();
-		assert(c.findOne!Test(id).t == "before transaction");
+		assert(c.findOne!Test(t.id).t == "before transaction");
 		
 		Connection c2 = Connection("host=127.0.0.1 dbname=test user=test");
 		c.begin();
 		t.t = "inside transaction";
-		c.update(id, t);
+		c.update(t.id, t);
 		
-		assert( c.findOne!Test(id).t == "inside transaction");
-		assert(c2.findOne!Test(id).t == "before transaction");
+		assert( c.findOne!Test(t.id).t == "inside transaction");
+		assert(c2.findOne!Test(t.id).t == "before transaction");
 		
 		c.commit();
-		assert( c.findOne!Test(id).t == "inside transaction");
-		assert(c2.findOne!Test(id).t == "inside transaction");
+		assert( c.findOne!Test(t.id).t == "inside transaction");
+		assert(c2.findOne!Test(t.id).t == "inside transaction");
 
 		c.exec("DROP TABLE transaction_test");
 		c2.close();
