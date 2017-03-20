@@ -1402,6 +1402,132 @@ struct Connection
 		assert(r[0][0].as!int == 1);
 	}
 	
+	/**
+		Begins a transaction block.
+	*/
+	void begin()
+	{
+		import dpq.query;
+		auto q = Query(this, "BEGIN");
+		q.run();
+	}
+	
+	/**
+		Commits current transaction
+	*/
+	void commit()
+	{
+		import dpq.query;
+		auto q = Query(this, "COMMIT");
+		q.run();
+	}
+	
+	/**
+		Creates savepoint in the current transaction block.
+		
+		Params:
+			name = name of created savepoint
+		
+		Returns: created Savepoint.
+	*/
+	Savepoint savepoint(string name)
+	{
+		import dpq.query;
+		Savepoint s = new Savepoint(name);
+		auto q = Query(this, "SAVEPOINT " ~ s.name);
+		q.run();
+		
+		return s;
+	}
+	
+	/**
+		Destroys savepoint in the current transaction block.
+		
+		Params:
+			s = savepoint to destroy
+	*/
+	void releaseSavepoint(Savepoint s)
+	{
+		import dpq.query;
+		auto q = Query(this, "RELEASE SAVEPOINT " ~ s.name);
+		q.run();
+	}
+	
+	/**
+		Rollback the current transaction to savepoint.
+		
+		Params:
+			s = savepoint to rollback to. If savepoint s is null or no savepoint is specified then transaction
+			will be rolled back to the begining.
+	*/ 	
+	void rollback(Savepoint s = null)
+	{
+		import dpq.query;
+		auto q = Query(this);
+		
+		if (s is null)
+			q.command = "ROLLBACK";
+		else
+			q.command = "ROLLBACK TO " ~ s.name;
+		
+		q.run();	
+	}
+	
+	unittest
+	{
+		writeln("\t * transaction");
+
+		@relation("transaction_test")
+		struct Test
+		{
+			@serial @PK int id;
+			string t;
+		}
+
+		c.ensureSchema!Test;
+
+		Test t;
+		t.t = "before transaction";
+
+		auto r = c.insertR(t, "id");
+		int id = r[0][0].as!int;
+
+		c.begin();
+		t.t = "this value is ignored";
+		c.update(id, t);
+
+		auto s1 = c.savepoint("s1");
+		t.t = "before savepoint s2";
+		c.update(id, t);
+		
+		auto s2 = c.savepoint("s2");
+		t.t = "after savepoint s2";
+		c.update(id, t);
+		
+		assert(c.findOne!Test(id).t == "after savepoint s2");
+		
+		c.rollback(s2);
+		assert(c.findOne!Test(id).t == "before savepoint s2");
+		
+		c.rollback();
+		assert(c.findOne!Test(id).t == "before transaction");
+		
+		Connection c2 = Connection("host=127.0.0.1 dbname=test user=test");
+		c.begin();
+		t.t = "inside transaction";
+		c.update(id, t);
+		
+		assert( c.findOne!Test(id).t == "inside transaction");
+		assert(c2.findOne!Test(id).t == "before transaction");
+		
+		c.commit();
+		assert( c.findOne!Test(id).t == "inside transaction");
+		assert(c2.findOne!Test(id).t == "inside transaction");
+
+		c.exec("DROP TABLE transaction_test");
+		c2.close();
+	}
+	
 	ref PreparedStatement prepared(string name)
 	{
 		return _prepared[name];
@@ -1444,6 +1570,16 @@ T deserialise(T)(Row r, string prefix = "")
 		}
 	}
 	return res;
+}
+
+class Savepoint
+{
+	string name;
+	
+	this(string name)
+	{
+		this.name = name;
+	}
 }
 
 /// Hold the last created connection, not to be used outside the library
