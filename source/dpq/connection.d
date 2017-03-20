@@ -1634,7 +1634,10 @@ struct Connection
 */
 T deserialise(T)(Row r, string prefix = "")
 {
-	T res;
+	static if (is(T == class))
+		T res = new T();
+	else
+		T res;
 	foreach (m; serialisableMembers!T)
 	{
 		enum member = "T." ~ m;
