@@ -711,9 +711,50 @@ struct Connection
 		return res;
 	}
 
+	/**
+		Returns an array of the specified type, filtered with the given filter and
+		params with length limited by limit
+
+		If no rows are returned by PostgreSQL, an empty array is returned.
+		If limit is set to -1 then all filtered rows are returned.
+
+		Examples:
+		----------------------
+		Connection conn; // An established connection
+		struct User
+		{
+			@serial @PKey int id;
+			string username;
+			int posts;
+		};
+
+		auto users = conn.findL!User("username = $1 OR posts > $2", 5, "foo", 42);
+		foreach (u; users)
+		{
+			... // do something
+		}
+		----------------------
+	*/
+	T[] findL(T, U...)(string filter, int limit, U vals)
+	{
+		QueryBuilder qb;
+		qb.select(AttributeList!T)
+			.from(relationName!T)
+			.where(filter)
+			.limit(limit);
+
+		auto q = qb.query(this);
+
+		T[] res;
+		foreach (r; q.run(vals))
+			res ~= deserialise!T(r);
+
+		return res;
+	}
+
 	unittest
 	{
-		writeln("\t * find");
+		writeln("\t * find, findL");
 
 		@relation("find_test")
 		struct Test
@@ -740,6 +781,12 @@ struct Connection
 		assert(ts.length == 5);
 		ts = c.find!Test("false");
 		assert(ts.length == 0);
+		ts = c.findL!Test("0 = 0", -1);
+		assert(ts.length == 5);
+		ts = c.findL!Test("my_n = $1", -1, 2);
+		assert(ts.length == 3);
+		ts = c.findL!Test("my_n = $1", 2, 2);
+		assert(ts.length == 2);
 
 		c.exec("DROP TABLE find_test");
 	}
