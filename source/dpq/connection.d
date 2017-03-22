@@ -711,9 +711,50 @@ struct Connection
 		return res;
 	}
 
+	/**
+		Returns an array of the specified type, filtered with the given filter and
+		params with length limited by limit
+
+		If no rows are returned by PostgreSQL, an empty array is returned.
+		If limit is set to -1 then all filtered rows are returned.
+
+		Examples:
+		----------------------
+		Connection conn; // An established connection
+		struct User
+		{
+			@serial @PKey int id;
+			string username;
+			int posts;
+		};
+
+		auto users = conn.findL!User("username = $1 OR posts > $2", 5, "foo", 42);
+		foreach (u; users)
+		{
+			... // do something
+		}
+		----------------------
+	*/
+	T[] findL(T, U...)(string filter, int limit, U vals)
+	{
+		QueryBuilder qb;
+		qb.select(AttributeList!T)
+			.from(relationName!T)
+			.where(filter)
+			.limit(limit);
+
+		auto q = qb.query(this);
+
+		T[] res;
+		foreach (r; q.run(vals))
+			res ~= deserialise!T(r);
+
+		return res;
+	}
+
 	unittest
 	{
-		writeln("\t * find");
+		writeln("\t * find, findL");
 
 		@relation("find_test")
 		struct Test
@@ -740,6 +781,12 @@ struct Connection
 		assert(ts.length == 5);
 		ts = c.find!Test("false");
 		assert(ts.length == 0);
+		ts = c.findL!Test("0 = 0", -1);
+		assert(ts.length == 5);
+		ts = c.findL!Test("my_n = $1", -1, 2);
+		assert(ts.length == 3);
+		ts = c.findL!Test("my_n = $1", 2, 2);
+		assert(ts.length == 2);
 
 		c.exec("DROP TABLE find_test");
 	}
@@ -978,6 +1025,7 @@ struct Connection
 		-------------------
 	 */
 	Result insertR(T)(T val, string ret = "")
+		if(!isArray!T)
 	{
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
@@ -985,6 +1033,40 @@ struct Connection
 			qb.returning(ret);
 
 		qb.addValues!T(val);
+
+		return qb.query(this).run();
+	}
+
+	/**
+		Inserts the given array structures in a singl query, returning whatever columns are specified by the
+		second param as a normal Result.
+
+		Equivalent to specifying RETURNING at the end of the query.
+
+		Examples:
+		-------------------
+		Connection c; // an established connection
+		struct Data { @PK int id, int a; int b; }
+		Data[2] myData;
+		auto result = c.insert(myData, "id");
+		-------------------
+	 */
+	Result insertR(T)(T vals, string ret = "")
+		if(isArray!T)
+	{
+		import std.range.primitives : ElementType;
+		alias ET = ElementType!T;
+
+		if (!vals.length)
+			return Result.init;
+		
+		QueryBuilder qb;
+		qb.insert(relationName!ET, AttributeList!(ET, true, true));
+		if (ret.length > 0)
+			qb.returning(ret);
+
+		foreach (val; vals)
+			qb.addValues!ET(val);
 
 		return qb.query(this).run();
 	}
@@ -1001,6 +1083,7 @@ struct Connection
 		---------------
 	 */
 	bool insert(T)(T val, bool async = false)
+		if(!isArray!T)
 	{
 		QueryBuilder qb;
 		qb.insert(relationName!T, AttributeList!(T, true, true));
@@ -1012,6 +1095,39 @@ struct Connection
 
 		auto r = qb.query(this).run();
 		return r.rows > 0;
+	}
+
+	/**
+		Inserts the given array of structures to the DB as one query
+
+		Examples:
+		---------------
+		Connection c; // An established connection
+		struct User {@PK @serial int id; int a }
+		User[2] myUsers;
+		c.insert(myUsers);
+		---------------
+	 */
+	int insert(T)(T vals, bool async = false)
+		if(isArray!T)
+	{
+		import std.range.primitives : ElementType;
+		alias ET = ElementType!T;
+		
+		QueryBuilder qb;
+		qb.insert(relationName!ET, AttributeList!(ET, true, true));
+
+		if (!vals.length)
+			return 0;
+
+		foreach (val; vals)
+			qb.addValues!ET(val);
+
+		if (async)
+			return qb.query(this).runAsync();
+
+		auto r = qb.query(this).run();
+		return r.rows;
 	}
 
 	unittest
@@ -1047,6 +1163,23 @@ struct Connection
 
 		Test t2 = c.findOneBy!Test("n", 1);
 		assert(t2 == t, t.to!string ~ " != " ~ t2.to!string);
+		
+		Test[] t_arr;
+		t_arr ~= Test.init;
+		t_arr[0].n = 1;
+		t_arr[0].n2 = 2;
+		t_arr[0].foo.bar = 3;
+		t_arr ~= Test.init;
+		t_arr[1].n = 4;
+		t_arr[1].n2 = 5;
+		t_arr[1].foo.bar = 6;
+		
+		auto r3 = c.insert(t_arr);
+		assert(r3 == 2);
+		
+		auto r4 = c.insertR(t_arr, "n");
+		assert(r4[0][0].as!int == t_arr[0].n);
+		assert(r4[1][0].as!int == t_arr[1].n);
 
 		writeln("\t\t * async");
 		t.n = 123;
@@ -1402,6 +1535,131 @@ struct Connection
 		assert(r[0][0].as!int == 1);
 	}
 	
+	/**
+		Begins a transaction block.
+	*/
+	void begin()
+	{
+		import dpq.query;
+		auto q = Query(this, "BEGIN");
+		q.run();
+	}
+	
+	/**
+		Commits current transaction
+	*/
+	void commit()
+	{
+		import dpq.query;
+		auto q = Query(this, "COMMIT");
+		q.run();
+	}
+	
+	/**
+		Creates savepoint in the current transaction block.
+		
+		Params:
+			name = name of created savepoint
+		
+		Returns: created Savepoint.
+	*/
+	Savepoint savepoint(string name)
+	{
+		import dpq.query;
+		Savepoint s = new Savepoint(name);
+		auto q = Query(this, "SAVEPOINT " ~ s.name);
+		q.run();
+		
+		return s;
+	}
+	
+	/**
+		Destroys savepoint in the current transaction block.
+		
+		Params:
+			s = savepoint to destroy
+	*/
+	void releaseSavepoint(Savepoint s)
+	{
+		import dpq.query;
+		auto q = Query(this, "RELEASE SAVEPOINT " ~ s.name);
+		q.run();
+	}
+	
+	/**
+		Rollback the current transaction to savepoint.
+		
+		Params:
+			s = savepoint to rollback to. If savepoint s is null or no savepoint is specified then transaction
+			will be rolled back to the begining.
+	*/ 	
+	void rollback(Savepoint s = null)
+	{
+		import dpq.query;
+		auto q = Query(this);
+		
+		if (s is null)
+			q.command = "ROLLBACK";
+		else
+			q.command = "ROLLBACK TO " ~ s.name;
+		
+		q.run();	
+	}
+	
+	unittest
+	{
+		writeln("\t * transaction");
+
+		@relation("transaction_test")
+		struct Test
+		{
+			@serial @PK int id;
+			string t;
+		}
+
+		c.ensureSchema!Test;
+
+		Test t;
+		t.t = "before transaction";
+		auto r = c.insertR(t, "id");
+		t.id = r[0][0].as!int;
+
+		c.begin();
+		t.t = "this value is ignored";
+		c.update(t.id, t);
+
+		auto s1 = c.savepoint("s1");
+		t.t = "before savepoint s2";
+		c.update(t.id, t);
+		
+		auto s2 = c.savepoint("s2");
+		t.t = "after savepoint s2";
+		c.update(t.id, t);
+		
+		assert(c.findOne!Test(t.id).t == "after savepoint s2");
+		
+		c.rollback(s2);
+		assert(c.findOne!Test(t.id).t == "before savepoint s2");
+		
+		c.rollback();
+		assert(c.findOne!Test(t.id).t == "before transaction");
+		
+		Connection c2 = Connection("host=127.0.0.1 dbname=test user=test");
+		c.begin();
+		t.t = "inside transaction";
+		c.update(t.id, t);
+		
+		assert( c.findOne!Test(t.id).t == "inside transaction");
+		assert(c2.findOne!Test(t.id).t == "before transaction");
+		
+		c.commit();
+		assert( c.findOne!Test(t.id).t == "inside transaction");
+		assert(c2.findOne!Test(t.id).t == "inside transaction");
+
+		c.exec("DROP TABLE transaction_test");
+		c2.close();
+	}
+	
 	ref PreparedStatement prepared(string name)
 	{
 		return _prepared[name];
@@ -1423,7 +1681,10 @@ struct Connection
 */
 T deserialise(T)(Row r, string prefix = "")
 {
-	T res;
+	static if (is(T == class))
+		T res = new T();
+	else
+		T res;
 	foreach (m; serialisableMembers!T)
 	{
 		enum member = "T." ~ m;
@@ -1444,6 +1705,16 @@ T deserialise(T)(Row r, string prefix = "")
 		}
 	}
 	return res;
+}
+
+class Savepoint
+{
+	string name;
+	
+	this(string name)
+	{
+		this.name = name;
+	}
 }
 
 /// Hold the last created connection, not to be used outside the library

@@ -751,10 +751,22 @@ struct QueryBuilder
 	private string insertCommand()
 	{
 		int index = 0;
-		string str = "INSERT INTO \"%s\" (%s) VALUES (%s)".format(
+		
+		string params = "(";
+		foreach (i, v; _indexParams)
+		{
+			params ~= "$%d".format(i + 1);
+			if ((i + 1) % _columns.length)
+				params ~= ", ";
+			else if ( (i + 1) < _indexParams.length)
+				params ~= "),(";
+		}
+		params ~= ")";
+		
+		string str = "INSERT INTO \"%s\" (%s) VALUES %s".format(
 				_table,
 				_columns.join(","),
-				_indexParams.map!(v => "$%d".format(++index)).join(", ")
+				params
 				);
 
 		if (_returning.length > 0)
@@ -772,11 +784,11 @@ struct QueryBuilder
 
 		QueryBuilder qb;
 		qb.insert("table", "col")
-			.values(1)
+			.values(1, 2)
 			.returning("id");
 
 		string str = qb.command();
-		assert(str == `INSERT INTO "table" (col) VALUES ($1) RETURNING id`);
+		assert(str == `INSERT INTO "table" (col) VALUES ($1),($2) RETURNING id`);
 	}
 
 	private string updateCommand()
