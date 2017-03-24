@@ -1054,19 +1054,18 @@ struct Connection
 	Result insertR(T)(T vals, string ret = "")
 		if(isArray!T)
 	{
-		import std.range.primitives : ElementType;
-		alias ET = ElementType!T;
+		alias BT = BaseType!T;
 
 		if (!vals.length)
 			return Result.init;
 		
 		QueryBuilder qb;
-		qb.insert(relationName!ET, AttributeList!(ET, true, true));
+		qb.insert(relationName!BT, AttributeList!(BT, true, true));
 		if (ret.length > 0)
 			qb.returning(ret);
 
 		foreach (val; vals)
-			qb.addValues!ET(val);
+			qb.addValues!BT(val);
 
 		return qb.query(this).run();
 	}
@@ -1111,17 +1110,16 @@ struct Connection
 	int insert(T)(T vals, bool async = false)
 		if(isArray!T)
 	{
-		import std.range.primitives : ElementType;
-		alias ET = ElementType!T;
+		alias BT = BaseType!T;
 		
 		QueryBuilder qb;
-		qb.insert(relationName!ET, AttributeList!(ET, true, true));
+		qb.insert(relationName!BT, AttributeList!(BT, true, true));
 
 		if (!vals.length)
 			return 0;
 
 		foreach (val; vals)
-			qb.addValues!ET(val);
+			qb.addValues!BT(val);
 
 		if (async)
 			return qb.query(this).runAsync();
