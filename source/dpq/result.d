@@ -38,7 +38,7 @@ struct Result
 		}
 
 		ExecStatusType status = PQresultStatus(res);
-
+		import std.experimental.logger;
 		switch (status)
 		{
 			case PGRES_EMPTY_QUERY:
@@ -316,6 +316,16 @@ struct Row
 	{
 		int c = _parent.columnIndex(col);
 		return opIndex(c);
+	}
+
+	string[string] toAA()
+	{
+		string[string] a;
+		import std.array;
+		for(auto i = 0; i<  _parent.columns; i++)
+			a[_parent.columnName(i)] = opIndex(i).as!string().get();
+		
+		return a;
 	}
 
 	unittest
