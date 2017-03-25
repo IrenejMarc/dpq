@@ -4,6 +4,7 @@ import dpq.attributes;
 import dpq.connection;
 import dpq.querybuilder;
 import dpq.value : Value;
+public import dpq.querybuilder : RowLock;
 
 import std.algorithm : map;
 import std.array;
@@ -266,6 +267,13 @@ struct RelationProxy(T)
 			return RT.init;
 		
 		return RT(result[result.rows - 1].deserialise!T);
+	}
+
+	@property ref auto for_(RowLock lock)
+	{
+		_markStale();
+		_queryBuilder.for_(lock);
+		return this;
 	}
 
 	/**

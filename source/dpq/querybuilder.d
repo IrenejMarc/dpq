@@ -30,6 +30,15 @@ private enum QueryType
 	delete_ = "DELETE"
 }
 
+enum RowLock
+{
+	none           = "",
+	forUpdate      = "FOR UPDATE",
+	forNoKeyUpdate = "FOR NO KEY UPDATE",
+	forShare       = "FOR SHARE",
+	forKeyShare    = "FOR KEY SHARE"
+}
+
 /**
 	A filter builder struct meant for internal usage.
 
@@ -116,6 +125,9 @@ struct QueryBuilder
 		// Limit and offset values, using -1 is null value (not set)
 		Nullable!(int, -1) _limit = -1;
 		Nullable!(int, -1) _offset = -1;
+
+		// Row-level lock
+		RowLock _rowLock;
 
 		// Params to be used in the filters
 		Value[string] _params;
@@ -447,6 +459,13 @@ struct QueryBuilder
 		assert(qb._offset == 1);
 	}
 
+	ref QueryBuilder for_(RowLock lock)
+	{
+		assert(_type == QueryType.select, "QueryBuilder.for_() can only be used for SELECT queries.");
+		_rowLock = lock;
+		return this;
+	}
+
 	// UPDATE methods
 	ref QueryBuilder update(string table)
 	{
@@ -729,6 +748,9 @@ struct QueryBuilder
 
 		if (!_offset.isNull)
 			str ~= " OFFSET %d".format(_offset);
+
+		if (_rowLock != RowLock.none)
+			str ~= " " ~ _rowLock;
 
 		return replaceParams(str);
 	}
