@@ -211,7 +211,7 @@ struct Result
 	int currentRangeIndex = 0;
 	@property bool empty()
 	{
-		return currentRangeIndex >= this.rows - 1;
+		return currentRangeIndex >= this.rows;
 	}
 
 	void popFront()
