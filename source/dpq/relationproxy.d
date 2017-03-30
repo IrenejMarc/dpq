@@ -152,6 +152,28 @@ struct RelationProxy(T)
 
 	alias all this;
 
+	T[] fetch(int limit = -1)
+	{
+		if (limit <= -1)
+		{
+			auto qb = _queryBuilder;
+			qb.limit(limit);
+			auto result = qb.query(_connection).run();
+			return result.map!(deserialise!T).array;
+		}
+		if (limit == 0)
+		{
+			return T[].init;
+		}
+		else
+		{
+			auto qb = _queryBuilder;
+			qb.limit(limit);
+			auto result = qb.query(_connection).run();
+			return result.map!(deserialise!T).array;
+		}
+	}
+
 	/**
 		Specifies filters according to the given AA. 
 		Filters will be joined with AND.
@@ -240,12 +262,39 @@ struct RelationProxy(T)
 		return RT(result[0].deserialise!T);
 	}
 
+	@property T[] first(string by, int limit = 1)
+	{
+		if (limit <= -1)
+		{
+			auto qb = _queryBuilder;
+			qb.limit(-1).order(by, Order.asc);
+			auto result = qb.query(_connection).run();
+			return result.map!(deserialise!T).array;
+		}
+		if (limit == 0)
+		{
+			return T[].init;
+		}
+		else
+		{
+			auto qb = _queryBuilder;
+			qb.limit(limit).order(by, Order.asc);
+			auto result = qb.query(_connection).run();
+			return result.map!(deserialise!T).array;
+		}
+	}
+
+	@property T[] first(int limit, string by = primaryKeyAttributeName!T)
+	{
+		return first(by, limit);
+	}
+
 	/**
 		Same as first, but defaults to desceding order, giving you the last match.
 
 		Caching acts the same as with first.
 	 */
-	@property Nullable!T last(string by = primaryKeyAttributeName!T)
+	@property Nullable!T last()
 	{
 		alias RT = Nullable!T;
 
@@ -267,6 +316,33 @@ struct RelationProxy(T)
 			return RT.init;
 		
 		return RT(result[result.rows - 1].deserialise!T);
+	}
+
+	@property T[] last(string by, int limit = 1)
+	{
+		if (limit <= -1)
+		{
+			auto qb = _queryBuilder;
+			qb.limit(-1).order(by, Order.desc);
+			auto result = qb.query(_connection).run();
+			return result.map!(deserialise!T).array;
+		}
+		else if (limit == 0)
+		{
+			return T[].init;
+		}
+		else
+		{
+			auto qb = _queryBuilder;
+			qb.limit(limit).order(by, Order.desc);
+			auto result = qb.query(_connection).run();
+			return result.map!(deserialise!T).array;
+		}
+	}
+
+	@property T[] last(int limit, string by = primaryKeyAttributeName!T)
+	{
+		return last(by, limit);
 	}
 
 	@property ref auto for_(RowLock lock)
@@ -518,4 +594,83 @@ bool save(T)(T record)
 	if (IsValidRelation!T)
 {
 	return T.saveRecord(record);
+}
+
+// Have to move unittest out of the RelationProxy scope due to recursive expansion
+unittest
+{
+	import std.stdio;
+
+	writeln(" * RelationProxy");
+
+	import std.algorithm : equal, all;
+
+	@relation("test")
+	struct Test
+	{
+		@serial @PK int id;
+		int data;
+	}
+
+	c.ensureSchema!Test;
+
+	Test[] t;
+	t ~= Test();
+	t[0].data = 789;
+	t ~= Test();
+	t[1].data = 123;
+	t ~= Test();
+	t[2].data = 456;
+
+	c.insert(t);
+
+	auto rp = RelationProxy!Test(c);
+
+	writeln("\t * first");
+	assert(rp.first.data               == 789);
+	assert(rp.first(2)[1].data         == 123);
+	assert(rp.first(2, "data")[0].data == 123);
+	assert(rp.first(-1)[0].data        == 789);
+
+	assert(equal(rp.first(2, "data"), rp.first("data", 2)));
+	assert([
+			rp.first(1)[0].data,
+			rp.first("id")[0].data,
+			rp.first(1, "id")[0].data
+		]
+		.all!(x => x == rp.first.data)
+	);
+
+	assert(rp.first(-2).length == 3);
+	assert(rp.first( 0).length == 0);
+	assert(rp.first( 2).length == 2);
+	assert(rp.first( 5).length == 3);
+
+	writeln("\t * last");
+	assert(rp.last.data               == 456);
+	assert(rp.last(2)[1].data         == 123);
+	assert(rp.last(2, "data")[0].data == 789);
+	assert(rp.last(-1)[0].data        == 456);
+
+	assert(equal(rp.last(2, "data"), rp.last("data", 2)));
+	assert([
+			rp.last(1)[0].data,
+			rp.last("id")[0].data,
+			rp.last(1, "id")[0].data
+		]
+		.all!(x => x == rp.last.data)
+	);
+
+	assert(rp.last(-2).length == 3);
+	assert(rp.last( 0).length == 0);
+	assert(rp.last( 2).length == 2);
+	assert(rp.last( 5).length == 3);
+
+	writeln("\t * fetch");
+	assert(rp.fetch(  ).length == 3);
+	assert(rp.fetch(-1).length == 3);
+	assert(rp.fetch( 0).length == 0);
+	assert(rp.fetch( 2).length == 2);
+
+	c.exec("DROP TABLE test;");
 }
