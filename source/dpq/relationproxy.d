@@ -6,7 +6,7 @@ import dpq.querybuilder;
 import dpq.value : Value;
 public import dpq.querybuilder : RowLock;
 
-import std.algorithm : map;
+import std.algorithm : map, clamp, reverse;
 import std.array;
 import std.meta : Alias;
 import std.typecons : Nullable;
@@ -79,6 +79,7 @@ struct RelationProxy(T)
 			fresh once any filters change or new ones are applied. 
 		 */
 		bool _contentFresh = false;
+		string _sortedBy = "";
 
 		/**
 			Update the content, does not check for freshness
@@ -145,33 +146,30 @@ struct RelationProxy(T)
 	{
 		// Update the content if it's not currently fresh or has not been fetched yet
 		if (!_contentFresh)
+		{
 			_updateContent();
+			_sortedBy = "";
+		}
 
 		return _content;
 	}
 
 	alias all this;
 
-	T[] fetch(int limit = -1)
+	@property T[] fetch(int limit = -1)
 	{
+		if (!_contentFresh)
+		{
+			_updateContent();
+			_sortedBy = "";
+		}
+
 		if (limit <= -1)
-		{
-			auto qb = _queryBuilder;
-			qb.limit(limit);
-			auto result = qb.query(_connection).run();
-			return result.map!(deserialise!T).array;
-		}
-		if (limit == 0)
-		{
-			return T[].init;
-		}
-		else
-		{
-			auto qb = _queryBuilder;
-			qb.limit(limit);
-			auto result = qb.query(_connection).run();
-			return result.map!(deserialise!T).array;
-		}
+			return _content;
+		if (limit >= 1)
+			return _content[0 .. limit.clamp(1, _content.length)];
+
+		return T[].init;
 	}
 
 	/**
@@ -243,7 +241,7 @@ struct RelationProxy(T)
 		alias RT = Nullable!T;
 
 		// If the content is fresh, we do not have to fetch anything
-		if (_contentFresh)
+		if (_contentFresh && _sortedBy == primaryKeyAttributeName!T)
 		{
 			if (_content.length == 0)
 				return RT.init;
@@ -264,24 +262,23 @@ struct RelationProxy(T)
 
 	@property T[] first(string by, int limit = 1)
 	{
-		if (limit <= -1)
-		{
-			auto qb = _queryBuilder;
-			qb.limit(-1).order(by, Order.asc);
-			auto result = qb.query(_connection).run();
-			return result.map!(deserialise!T).array;
-		}
 		if (limit == 0)
-		{
 			return T[].init;
-		}
-		else
+
+		if (!_contentFresh || _sortedBy != by)
 		{
 			auto qb = _queryBuilder;
-			qb.limit(limit).order(by, Order.asc);
+			qb.order(by, Order.asc);
 			auto result = qb.query(_connection).run();
-			return result.map!(deserialise!T).array;
+			_content = result.map!(deserialise!T).array;
+			_markFresh();
+			_sortedBy = by;
 		}
+
+		if (limit <= -1)
+			return _content;
+
+		return _content[0 .. limit.clamp(1, _content.length)];
 	}
 
 	@property T[] first(int limit, string by = primaryKeyAttributeName!T)
@@ -299,7 +296,7 @@ struct RelationProxy(T)
 		alias RT = Nullable!T;
 
 		// If the content is fresh, we do not have to fetch anything
-		if (_contentFresh)
+		if (_contentFresh && _sortedBy == primaryKeyAttributeName!T)
 		{
 			if (_content.length == 0)
 				return RT.init;
@@ -320,24 +317,29 @@ struct RelationProxy(T)
 
 	@property T[] last(string by, int limit = 1)
 	{
+		if (limit == 0)
+			return T[].init;
+
+		if (!_contentFresh || _sortedBy != by)
+		{
+			auto qb = _queryBuilder;
+			qb.order(by, Order.asc); // Yes, ASC. We will reverse it later
+			auto result = qb.query(_connection).run();
+			_content = result.map!(deserialise!T).array;
+			_markFresh();
+			_sortedBy = by;
+		}
+
 		if (limit <= -1)
 		{
-			auto qb = _queryBuilder;
-			qb.limit(-1).order(by, Order.desc);
-			auto result = qb.query(_connection).run();
-			return result.map!(deserialise!T).array;
+			auto result = _content.dup;
+			reverse(result);
+			return result;
 		}
-		else if (limit == 0)
-		{
-			return T[].init;
-		}
-		else
-		{
-			auto qb = _queryBuilder;
-			qb.limit(limit).order(by, Order.desc);
-			auto result = qb.query(_connection).run();
-			return result.map!(deserialise!T).array;
-		}
+
+		auto result = _content[_content.length - limit.clamp(1, _content.length) .. $].dup;
+		reverse(result);
+		return result;
 	}
 
 	@property T[] last(int limit, string by = primaryKeyAttributeName!T)

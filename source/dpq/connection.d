@@ -938,7 +938,7 @@ struct Connection
 		Params:
 			id = value of the relation's PK to filter by
 			updates = the structure that will provide values for the UPDATE
-			asnyc = whether the query should be sent async
+			async = whether the query should be sent async
 
 		Examples:
 		------------------
