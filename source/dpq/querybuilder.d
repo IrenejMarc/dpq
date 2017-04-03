@@ -459,9 +459,10 @@ struct QueryBuilder
 		assert(qb._offset == 1);
 	}
 
+	/// Row-level locking
 	ref QueryBuilder for_(RowLock lock)
 	{
-		assert(_type == QueryType.select, "QueryBuilder.for_() can only be used for SELECT queries.");
+		assert(_type == QueryType.select, "QueryBuilder.for_() can only be used on SELECT queries.");
 		_rowLock = lock;
 		return this;
 	}
