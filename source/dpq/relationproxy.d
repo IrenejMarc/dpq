@@ -79,6 +79,11 @@ struct RelationProxy(T)
 			fresh once any filters change or new ones are applied. 
 		 */
 		bool _contentFresh = false;
+
+		/**
+			Tracks which column is the content sorted by. Empty string means that
+			the content is not guaranteed to be sorted.
+		 */
 		string _sortedBy = "";
 
 		/**
@@ -156,6 +161,21 @@ struct RelationProxy(T)
 
 	alias all this;
 
+	/**
+		Returns the actual content, executing the query if data has not yet been
+		fetched from the database limited by limit rows.
+
+		Params:
+			limit = number of rows to return. If set to any negative value, then
+			all rows will be returned. That is the default behavior.
+
+		Note:
+			In its current implementation this function will fetch all rows
+			satisfying filters and cache them. Limit parameter affects how
+			many rows will actually be returned from cache.
+
+			Does not guarantee order of returned rows.
+	 */
 	@property T[] fetch(int limit = -1)
 	{
 		if (!_contentFresh)
@@ -220,15 +240,10 @@ struct RelationProxy(T)
 
 		Will return a Nullable null value if no matches.
 
-		If data is already cached and not marked stale/unfresh, it will reuse it,
-		meaning that calling this after calling all will not generate an additional
-		query, even if called multiple times.
+		If data is already cached, not marked stale/unfresh and ordered by PK,
+		it will reuse it, meaning that calling this after calling all
+		will not generate an additional query, even if called multiple times.
 		Will not cache its own result, only reuse existing data.
-
-		Params:
-			by = optional, specifies the column to order by, defaults to PK name
-			order = Order to sort by, (Order.asc, Order.desc), optional, defaults to asc
-			filters = optional filters to apply
 
 		Example:
 		-----------------
@@ -260,6 +275,29 @@ struct RelationProxy(T)
 		return RT(result[0].deserialise!T);
 	}
 
+	/**
+		Fetches first limit records matching the filters.
+
+		Will return an empty array if no matches.
+
+		If data is already cached, not marked stale/unfresh and ordered by specified
+		column, it will reuse it, meaning that calling this after calling all
+		will not generate an additional query, even if called multiple times.
+		Will not cache its own result, only reuse existing data.
+
+		Params:
+			by = specifies the column to order by, defaults to PK name.
+			limit = specifies how many rows to return, defaults to 1.
+			If set to negative value, all matching rows will be returned.
+
+		Example:
+		-----------------
+		auto p = RelationProxy!User();
+		auto users = p.where(["something": 123]).first(5);
+		auto users = p.first("RegistrationDate");
+		auto users = p.first("RegistrationDate", 10);
+		-----------------
+	 */
 	@property T[] first(string by, int limit = 1)
 	{
 		if (limit == 0)
@@ -281,6 +319,7 @@ struct RelationProxy(T)
 		return _content[0 .. limit.clamp(1, _content.length)];
 	}
 
+	/// ditto
 	@property T[] first(int limit, string by = primaryKeyAttributeName!T)
 	{
 		return first(by, limit);
@@ -315,6 +354,16 @@ struct RelationProxy(T)
 		return RT(result[result.rows - 1].deserialise!T);
 	}
 
+	/**
+		Same as first(by, limit), but defaults to desceding order, giving you the last match.
+
+		Caching acts the same as with first.
+
+		Note:
+			Actually this function uses ascending order internally and simply reverses it.
+			This behavior is intentional and used to prevent additinal query to a database
+			to change the order.
+	 */
 	@property T[] last(string by, int limit = 1)
 	{
 		if (limit == 0)
@@ -342,11 +391,15 @@ struct RelationProxy(T)
 		return result;
 	}
 
+	/// ditto
 	@property T[] last(int limit, string by = primaryKeyAttributeName!T)
 	{
 		return last(by, limit);
 	}
 
+	/**
+		Sets explicit row-level lock on returned rows.
+	 */
 	@property ref auto for_(RowLock lock)
 	{
 		_markStale();
