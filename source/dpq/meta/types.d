@@ -1,13 +1,9 @@
-///
-module dpq.meta;
-
-import dpq.attributes;
+/// Types-related metaprogramming stuff
+module dpq.meta.types;
 
 import std.traits;
 import std.typecons : Nullable;
 import std.datetime : SysTime;
-
-version(unittest) import std.stdio;
 
 /**
 	Returns the array's base type
@@ -39,6 +35,7 @@ template BaseType(T)
 
 unittest
 {
+	import std.stdio;
 	writeln(" * meta");
 	writeln("\t * BaseType");
 
@@ -46,35 +43,6 @@ unittest
 	static assert(is(BaseType!(string[]) == string));
 	static assert(is(BaseType!string == string));
 	static assert(is(BaseType!dstring == dstring));
-}
-
-/**
-	Returns the number of dimensions of the given array type
-
-	Examples:
-	-----------------
-	auto dims = ArrayDimensions!(int[][]);
-	static assert(dims == 2);
-	-----------------
- */
-deprecated("Use ArraySerialier's ArrayDimensions instead")
-template ArrayDimensions(T)
-{
-	static if (isArray!T)
-		enum ArrayDimensions = 1 + ArrayDimensions!(ForeachType!T);
-	else 
-		enum ArrayDimensions = 0;
-}
-
-
-/// Removes any Nullable specifiers, even multiple levels
-template NoNullable(T)
-{
-	static if (isInstanceOf!(Nullable, T))
-		// Nullable nullable? Costs us nothing, so why not
-		alias NoNullable = NoNullable!(Unqual!(ReturnType!(T.get)));
-	else
-		alias NoNullable = T;
 }
 
 /**
@@ -96,4 +64,14 @@ template RealType(T)
 		alias RealType = NT;
 	else
 		alias RealType = RealType!NT;
+}
+
+/// Removes any Nullable specifiers, even multiple levels
+template NoNullable(T)
+{
+	static if (isInstanceOf!(Nullable, T))
+		// Nullable nullable? Costs us nothing, so why not
+		alias NoNullable = NoNullable!(Unqual!(ReturnType!(T.get)));
+	else
+		alias NoNullable = T;
 }

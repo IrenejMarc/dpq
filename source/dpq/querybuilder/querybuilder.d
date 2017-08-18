@@ -1,19 +1,18 @@
 ///
-module dpq.querybuilder;
+module dpq.querybuilder.querybuilder;
 
-import dpq.value;
-import dpq.query;
-import dpq.connection;
 import dpq.attributes;
 import dpq.column;
+import dpq.connection;
+import dpq.query;
+import dpq.querybuilder.filterbuilder;
+import dpq.value;
 
-import std.typecons;
-import std.string;
-
-import std.algorithm : map, sum;
+import std.stdio;
+import std.algorithm : map;
 import std.conv : to;
-
-version (unittest) import std.stdio;
+import std.string;
+import std.typecons : Nullable;
 
 enum Order : string
 {
@@ -22,7 +21,7 @@ enum Order : string
 	desc = "DESC"
 };
 
-private enum QueryType
+package enum QueryType
 {
 	select = "SELECT",
 	update = "UPDATE",
@@ -30,48 +29,6 @@ private enum QueryType
 	delete_ = "DELETE"
 }
 
-/**
-	A filter builder struct meant for internal usage.
-
-	Simplifies building a combination of AND/OR filters and makes the code more
-	readable.
- */
-private struct FilterBuilder
-{
-	private string[][] _filters;
-
-	ref FilterBuilder and(string filter)
-	{
-		if (_filters.length == 0)
-			_filters.length++;
-
-		_filters[$ - 1] ~= '(' ~ filter ~ ')';
-
-		return this;
-	}
-
-	ref FilterBuilder or()
-	{
-		_filters ~= [];
-
-		return this;
-	}
-
-	/// Returns the actual number of lowest-level filters
-	long length()
-	{
-		return _filters.map!(f => f.length).sum;
-	}
-
-
-	string toString()
-	{
-		// Join inner filters by AND, outer by OR
-		return _filters.map!(innerFilter =>
-				innerFilter.join(" AND ")
-				).join(" OR ");
-	}
-}
 
 /**
 	Provides a nice way of writing queries in D, as well as some handy shortcuts

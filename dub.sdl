@@ -1,5 +1,5 @@
 name "dpq"
-description "A postgresql (libpq, pq) library aiming to be simple to use"
+description "A simple & very powerful PostgreSQL (libpq, pq) library"
 copyright "Copyright © 2016, Irenej Marc"
 authors "Irenej"
 targetType "library"

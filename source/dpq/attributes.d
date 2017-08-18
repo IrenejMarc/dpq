@@ -327,7 +327,7 @@ template primaryKeyName(T)
  */
 template primaryKeyAttributeName(T)
 {
-	enum primaryKeyAttributeName = attributeName!(mixin("T." ~ primaryKeyName!T));
+	alias primaryKeyAttributeName = attributeName!(mixin("T." ~ primaryKeyName!T));
 }
 
 unittest

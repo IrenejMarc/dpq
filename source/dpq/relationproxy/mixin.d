@@ -1,7 +1,7 @@
-///
-module dpq.mixins;
+/// RelationMixin
+module dpq.relationproxy.mixin_;
 
-import dpq.relationproxy;
+import dpq.relationproxy.relationproxy;
 import std.typecons : Nullable;
 
 /**

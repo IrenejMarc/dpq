@@ -1,26 +1,16 @@
-module dpq.relationproxy;
+module dpq.relationproxy.relationproxy;
 
 import dpq.attributes;
 import dpq.connection;
+import dpq.meta.relations;
 import dpq.querybuilder;
 import dpq.value : Value;
+import dpq.relationproxy.records;
 
 import std.algorithm : map;
 import std.array;
 import std.meta : Alias;
 import std.typecons : Nullable;
-
-/**
-	 Verifies that the given type can be used a relation
- */
-template IsValidRelation(T)
-{
-	import std.traits : hasUDA;
-
-	// Class or struct, and has a RelationAttribute.
-	enum IsValidRelation = (is(T == struct) || is(T == class)) &&
-		hasUDA!(T, RelationAttribute);
-}
 
 
 /**
@@ -215,7 +205,7 @@ struct RelationProxy(T)
 		auto user = p.where(["something": 123]).first;
 		-----------------
 	 */
-	@property Nullable!T first()
+	@property Nullable!T first(string by = "")
 	{
 		alias RT = Nullable!T;
 
@@ -227,9 +217,12 @@ struct RelationProxy(T)
 			return RT(_content[0]);
 		}
 
+		if (by.empty)
+			by = primaryKeyAttributeName!T;
+
 		// Make a copy of the builder, as to not ruin the query in case of reuse
 		auto qb = _queryBuilder;
-		qb.limit(1).order(primaryKeyAttributeName!T, Order.asc);
+		qb.limit(1).order(by, Order.asc);
 
 		auto result = qb.query(_connection).run();
 
@@ -244,7 +237,7 @@ struct RelationProxy(T)
 
 		Caching acts the same as with first.
 	 */
-	@property Nullable!T last(string by = primaryKeyAttributeName!T)
+	@property Nullable!T last(string by = "")
 	{
 		alias RT = Nullable!T;
 
@@ -256,9 +249,12 @@ struct RelationProxy(T)
 			return RT(_content[$ - 1]);
 		}
 
+		if (by.empty)
+			by = primaryKeyAttributeName!T;
+
 		// Make a copy of the builder, as to not ruin the query in case of reuse
 		auto qb = _queryBuilder;
-		qb.limit(1).order(primaryKeyAttributeName!T, Order.desc);
+		qb.limit(1).order(by, Order.desc);
 
 		auto result = qb.query(_connection).run();
 
@@ -442,72 +438,4 @@ struct RelationProxy(T)
 	{
 		return "<RelationProxy!" ~ T.stringof ~ "::`" ~ _queryBuilder.command ~ "`>";
 	}
-}
-
-
-/**************************************************/
-/* Methods meant to be used on records themselves */
-/**************************************************/
-
-/**
-	Reloads the record from the DB, overwrites it. Returns a reference to the 
-	same object.
-
-	Examples:
-	---------------------
-	User user = User.first;
-	writeln("My user is: ", user);
-	user.update(["username": "Oopdated Ooser"]);
-	writeln("My user is: ", user);
-	writeln("My user from DB is: ", User.find(user.id));
-	writeln("Reloaded user ", user.reload); // will be same as above
-	---------------------
- */
-ref T reload(T)(ref T record)
-	if (IsValidRelation!T)
-{
-	enum pkName = primaryKeyName!T;
-	record = T.find(__traits(getMember, record, pkName));
-
-	return record;
-}
-
-/**
-	Updates a single record with the new values, does not set them on the record
-	itself.
-
-	Examples:
-	--------------------
-	User user = User.first;
-	user.update(["username": "Some new name"]); // will run an UPDATE query
-	user.reload(); // Can be reloaded after to fetch new data from DB if needed
-	--------------------
-
- */
-auto update(T, U)(T record, U[string] values)
-	if (IsValidRelation!T)
-{
-	enum pkName = primaryKeyName!T;
-
-	return T.updateOne(__traits(getMember, record, pkName), values);
-}
-
-/**
-	Removes a record from the DB, filtering by the primary key.
- */
-auto remove(T)(T record)
-	if (IsValidRelation!T)
-{
-	enum pkName = primaryKeyName!T;
-
-	return T.removeOne(__traits(getMember, record, pkName));
-}
-
-/**
-	See: RelationProxy's save method
- */
-bool save(T)(T record)
-	if (IsValidRelation!T)
-{
-	return T.saveRecord(record);
 }
