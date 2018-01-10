@@ -199,7 +199,7 @@ struct Query
 	 */
 	Result run()
 	{
-		import std.datetime;
+		import std.datetime.stopwatch : StopWatch;
 
 		StopWatch sw;
 		sw.start();

@@ -27,7 +27,7 @@ struct Result
 {
 	alias ResultPtr = SmartPointer!(PGresult*, PQclear);
 	private ResultPtr _result;
-	private TickDuration _time;
+	private Duration _time;
 
 	this(PGresult* res)
 	{
@@ -122,12 +122,12 @@ struct Result
 		c.exec("DROP TABLE test_query");
 	}
 
-	@property TickDuration time()
+	@property Duration time()
 	{
 		return _time;
 	}
 
-	@property package void time(TickDuration time)
+	@property package void time(Duration time)
 	{
 		_time = time;
 	}
