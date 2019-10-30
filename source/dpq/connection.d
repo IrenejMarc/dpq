@@ -79,7 +79,7 @@ struct Connection
 		assert(c.status == CONNECTION_OK);
 	}
 
-	/** 
+	/**
 		Close the connection manually
 	*/
 	void close()
@@ -229,10 +229,10 @@ struct Connection
 		}
 		else
 			return Result(PQexecParams(
-					_connection, 
-					cStr, 
+					_connection,
+					cStr,
 					params.length.to!int,
-					pTypes.ptr, 
+					pTypes.ptr,
 					cast(const(char*)*)pValues.ptr,
 					pLengths.ptr,
 					pFormats.ptr,
@@ -404,7 +404,7 @@ struct Connection
 				enum uda = getUDAs!(mixin(member), ForeignKeyAttribute)[0];
 
 				// Create the FK
-				additionalQueries ~= 
+				additionalQueries ~=
 					`ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY(%s) REFERENCES %s (%s)`.format(
 							escRelName,
 							escapeIdentifier("%s_%s_fk_%s".format(relName, attrName, uda.relation)),
@@ -450,8 +450,8 @@ struct Connection
 	package void addOidsFor(string typeName)
 	{
 		auto r = execParams("SELECT $1::regtype::oid, $2::regtype::oid", typeName, typeName ~ "[]");
-		Oid typeOid = r[0][0].as!int;
-		Oid arrOid = r[0][1].as!int;
+		Oid typeOid = r[0][0].as!(int).get;
+		Oid arrOid = r[0][1].as!(int).get;
 
 		CompositeTypeSerialiser.addCustomOid(typeName, typeOid);
 		ArraySerialiser.addCustomOid(typeOid, arrOid);
@@ -469,7 +469,7 @@ struct Connection
 		Examples:
 		-----------------------
 		Connection conn; // An established connection
-		struct User 
+		struct User
 		{
 			@serial8 @PKey long id;
 			string username;
@@ -514,7 +514,7 @@ struct Connection
 		}
 
 		c.ensureSchema!TestTable1;
-		
+
 		auto res = c.execParams(
 				"SELECT COUNT(*) FROM pg_catalog.pg_tables WHERE tablename = $1",
 				relationName!TestTable1);
@@ -622,11 +622,11 @@ struct Connection
 			return Nullable!T.init;
 
 		//return T();
-		
+
 		auto res = deserialise!T(r[0]);
 		return Nullable!T(res);
 	}
-	
+
 	/**
 		Returns the requested structure, searches by the specified filter
 		with given params
@@ -979,7 +979,7 @@ struct Connection
 	unittest
 	{
 		writeln("\t * update with object");
-		
+
 		@relation("update_object_test")
 		struct Test
 		{
@@ -996,7 +996,7 @@ struct Connection
 
 		t.n = 2;
 		c.update!Test(1, t);
-		
+
 		t = c.findOne!Test(1);
 		assert(t.n == 2);
 
@@ -1058,7 +1058,7 @@ struct Connection
 
 		if (!vals.length)
 			return Result.init;
-		
+
 		QueryBuilder qb;
 		qb.insert(relationName!BT, AttributeList!(BT, true, true));
 		if (ret.length > 0)
@@ -1111,7 +1111,7 @@ struct Connection
 		if(isArray!T)
 	{
 		alias BT = BaseType!T;
-		
+
 		QueryBuilder qb;
 		qb.insert(relationName!BT, AttributeList!(BT, true, true));
 
@@ -1151,7 +1151,7 @@ struct Connection
 		t.n = 1;
 		t.n2 = 2;
 		t.foo.bar = 2;
-		
+
 		auto r = c.insert(t);
 		assert(r == true);
 
@@ -1161,7 +1161,7 @@ struct Connection
 
 		Test t2 = c.findOneBy!Test("n", 1);
 		assert(t2 == t, t.to!string ~ " != " ~ t2.to!string);
-		
+
 		Test[] t_arr;
 		t_arr ~= Test.init;
 		t_arr[0].n = 1;
@@ -1171,10 +1171,10 @@ struct Connection
 		t_arr[1].n = 4;
 		t_arr[1].n2 = 5;
 		t_arr[1].foo.bar = 6;
-		
+
 		auto r3 = c.insert(t_arr);
 		assert(r3 == 2);
-		
+
 		auto r4 = c.insertR(t_arr, "n");
 		assert(r4[0][0].as!int == t_arr[0].n);
 		assert(r4[1][0].as!int == t_arr[1].n);
@@ -1183,7 +1183,7 @@ struct Connection
 		t.n = 123;
 		t.n2.nullify;
 		c.insertAsync(t);
-		
+
 		auto res = c.nextResult();
 		assert(res.rows == 1);
 		t2 = c.findOneBy!Test("n", 123);
@@ -1395,14 +1395,14 @@ struct Connection
 	Result[] allResults()
 	{
 		Result[] res;
-		
+
 		PGresult* r;
 		while ((r = PQgetResult(_connection)) != null)
 			res ~= Result(r);
 
 		return res;
 	}
-	
+
 	/**
 		Calls nextResult until null is returned, then retuns only the last non-null result.
 	 */
@@ -1515,7 +1515,7 @@ struct Connection
 	unittest
 	{
 		writeln("\t * prepare");
-		// The result of this isn't really all that useful, but as long as it 
+		// The result of this isn't really all that useful, but as long as it
 		// throws on errors, it kinda is
 		c.prepare("prepare_test", "SELECT $1", Type.INT4);
 
@@ -1532,7 +1532,7 @@ struct Connection
 		assert(r.rows == 1);
 		assert(r[0][0].as!int == 1);
 	}
-	
+
 	/**
 		Begins a transaction block.
 	*/
@@ -1542,7 +1542,7 @@ struct Connection
 		auto q = Query(this, "BEGIN");
 		q.run();
 	}
-	
+
 	/**
 		Commits current transaction
 	*/
@@ -1552,13 +1552,13 @@ struct Connection
 		auto q = Query(this, "COMMIT");
 		q.run();
 	}
-	
+
 	/**
 		Creates savepoint in the current transaction block.
-		
+
 		Params:
 			name = name of created savepoint
-		
+
 		Returns: created Savepoint.
 	*/
 	Savepoint savepoint(string name)
@@ -1567,13 +1567,13 @@ struct Connection
 		Savepoint s = new Savepoint(name);
 		auto q = Query(this, "SAVEPOINT " ~ s.name);
 		q.run();
-		
+
 		return s;
 	}
-	
+
 	/**
 		Destroys savepoint in the current transaction block.
-		
+
 		Params:
 			s = savepoint to destroy
 	*/
@@ -1583,27 +1583,27 @@ struct Connection
 		auto q = Query(this, "RELEASE SAVEPOINT " ~ s.name);
 		q.run();
 	}
-	
+
 	/**
 		Rollback the current transaction to savepoint.
-		
+
 		Params:
 			s = savepoint to rollback to. If savepoint s is null or no savepoint is specified then transaction
 			will be rolled back to the begining.
-	*/ 	
+	*/
 	void rollback(Savepoint s = null)
 	{
 		import dpq.query;
 		auto q = Query(this);
-		
+
 		if (s is null)
 			q.command = "ROLLBACK";
 		else
 			q.command = "ROLLBACK TO " ~ s.name;
-		
-		q.run();	
+
+		q.run();
 	}
-	
+
 	unittest
 	{
 		writeln("\t * transaction");
@@ -1629,27 +1629,27 @@ struct Connection
 		auto s1 = c.savepoint("s1");
 		t.t = "before savepoint s2";
 		c.update(t.id, t);
-		
+
 		auto s2 = c.savepoint("s2");
 		t.t = "after savepoint s2";
 		c.update(t.id, t);
-		
+
 		assert(c.findOne!Test(t.id).t == "after savepoint s2");
-		
+
 		c.rollback(s2);
 		assert(c.findOne!Test(t.id).t == "before savepoint s2");
-		
+
 		c.rollback();
 		assert(c.findOne!Test(t.id).t == "before transaction");
-		
+
 		Connection c2 = Connection("host=127.0.0.1 dbname=test user=test");
 		c.begin();
 		t.t = "inside transaction";
 		c.update(t.id, t);
-		
+
 		assert( c.findOne!Test(t.id).t == "inside transaction");
 		assert(c2.findOne!Test(t.id).t == "before transaction");
-		
+
 		c.commit();
 		assert( c.findOne!Test(t.id).t == "inside transaction");
 		assert(c2.findOne!Test(t.id).t == "inside transaction");
@@ -1657,7 +1657,7 @@ struct Connection
 		c.exec("DROP TABLE transaction_test");
 		c2.close();
 	}
-	
+
 	ref PreparedStatement prepared(string name)
 	{
 		return _prepared[name];
@@ -1694,9 +1694,9 @@ T deserialise(T)(Row r, string prefix = "")
 		{
 			auto x = r[prefix ~ n].as!MType;
 			if (!x.isNull)
-				__traits(getMember, res, m) = cast(OType) x;
+				__traits(getMember, res, m) = cast(OType) x.get;
 		}
-		catch (DPQException e) 
+		catch (DPQException e)
 		{
 			if (!isInstanceOf!(Nullable, MType))
 				throw e;
@@ -1708,7 +1708,7 @@ T deserialise(T)(Row r, string prefix = "")
 class Savepoint
 {
 	string name;
-	
+
 	this(string name)
 	{
 		this.name = name;
