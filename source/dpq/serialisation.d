@@ -35,7 +35,9 @@ package Nullable!(ubyte[]) toBytes(T)(T val)
 		return Nullable!(ubyte[]).init;
 
 	alias serialiser = SerialiserFor!AT;
-auto x  = serialiser.serialise(cast(AT) val);
+
+   auto av = (cast(AT)(val));
+   auto x = serialiser.serialise(av);
 	return Nullable!(ubyte[])(x.get);
 }
 
@@ -116,7 +118,7 @@ package T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 {
 	alias AT = RealType!T;
 
-	return T(fromBytes!AT(bytes, len));
+	return T(fromBytes!AT(bytes, len).get);
 }
 
 package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)

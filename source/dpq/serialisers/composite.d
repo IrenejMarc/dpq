@@ -21,7 +21,7 @@ import libpq.libpq;
 	The default serialiser for any composite type (structs and classes)
 
 	For custom types, the data representation is the following
-	 
+
 	First 4 bytes are an int representing the number of members
 	After that, the members are listed in the following way:
 		- OID
@@ -34,14 +34,14 @@ import libpq.libpq;
  */
 struct CompositeTypeSerialiser
 {
-	/** 
+	/**
 		Only accepts structs and classes, will fail on Nullable or Typedef types
 		which should be taken care of by toBytes function.
 	 */
 	static bool isSupportedType(T)()
 	{
-		return 
-			is(T == class) || is(T == struct) && 
+		return
+			is(T == class) || is(T == struct) &&
 			!is(T == SysTime) &&
 			!isInstanceOf!(Typedef, T);
 	}
@@ -64,7 +64,7 @@ struct CompositeTypeSerialiser
 
 		alias members = serialisableMembers!T;
 		ubyte[] data;
-		
+
 		// The number of members of this type
 		data ~= nativeToBigEndian(cast(int) members.length);
 
@@ -85,7 +85,7 @@ struct CompositeTypeSerialiser
 			else
 			{
 				// The element length and data itself
-				data ~= nativeToBigEndian(bytes.length.to!int);
+				data ~= nativeToBigEndian(bytes.get.length.to!int);
 				data ~= bytes;
 			}
 		}
@@ -107,7 +107,7 @@ struct CompositeTypeSerialiser
 						length,
 						members.length
 						));
-		
+
 		T result;
 		foreach (mName; members)
 		{
@@ -123,7 +123,7 @@ struct CompositeTypeSerialiser
 				continue;
 
 			// Read the value
-			__traits(getMember, result, mName) = cast(OT) fromBytes!MT(bytes[0 .. mLen], mLen);
+			__traits(getMember, result, mName) = cast(OT) fromBytes!MT(bytes[0 .. mLen], mLen).get;
 
 			// "Consume" the bytes that were just read
 			bytes = bytes[mLen .. $];
@@ -163,7 +163,7 @@ struct CompositeTypeSerialiser
 			columns ~= escAttrName ~ " " ~ attrType;
 		}
 
-		try 
+		try
 		{
 			conn.exec("CREATE TYPE %s AS (%s)".format(escTypeName, columns.join(", ")));
 		} catch (DPQException e) {} // Horrible, but just means the type already exists
@@ -182,7 +182,7 @@ struct CompositeTypeSerialiser
 	static Oid oidForType(T)()
 	{
 		enforceSupportedType!T;
-		
+
 		auto oid = nameForType!T in _customOids;
 		assert(
 				oid != null,
@@ -224,7 +224,7 @@ unittest
 
 	Test t = Test(1, 2);
 	auto serialised = CompositeTypeSerialiser.serialise(t);
-	auto deserialised = CompositeTypeSerialiser.deserialise!Test(serialised);
+	auto deserialised = CompositeTypeSerialiser.deserialise!Test(serialised.get);
 
 	// Why is this throwing AssertError???
 	//assert(t == deserialised);

@@ -312,7 +312,7 @@ struct Connection
 		{
 			c.execParams("SELECT_BADSYNTAX $1::INT4", 1);
 		}
-		catch {}
+		catch(Throwable) {}
 
 		assert(c.errorMessage.length != 0);
 	}
@@ -572,7 +572,7 @@ struct Connection
 					relationName!Testy, attributeName!(Testy.intArr)));
 
 		writeln("\t\t * Valid result");
-		Testy t = c.findOne!Testy(1);
+		Testy t = c.findOne!Testy(1).get;
 		assert(t.id == 1, `t.id == 1` );
 		assert(t.foo == "somestr", `t.foo == "somestr"`);
 		assert(t.bar == 2, `t.bar == 2`);
@@ -580,7 +580,7 @@ struct Connection
 		assert(t.intArr == [1,2,3], `t.intArr == [1,2,3]`);
 
 		writeln("\t\t * findOne with custom filter");
-		Testy t2 = c.findOne!Testy("id = $1", 1);
+		Testy t2 = c.findOne!Testy("id = $1", 1).get;
 		assert(t == t2);
 
 		c.exec("DROP TABLE " ~ relationName!Testy);
@@ -1159,7 +1159,7 @@ struct Connection
 		assert(r2.rows == 1);
 		assert(r2[0][0].as!int == t.n);
 
-		Test t2 = c.findOneBy!Test("n", 1);
+		Test t2 = c.findOneBy!Test("n", 1).get;
 		assert(t2 == t, t.to!string ~ " != " ~ t2.to!string);
 
 		Test[] t_arr;
@@ -1324,7 +1324,7 @@ struct Connection
 		q = str;
 		auto r = q.run(vals);
 
-		return r[0][0].as!long;
+		return r[0][0].as!long.get;
 	}
 
 	unittest
@@ -1620,7 +1620,7 @@ struct Connection
 		Test t;
 		t.t = "before transaction";
 		auto r = c.insertR(t, "id");
-		t.id = r[0][0].as!int;
+		t.id = r[0][0].as!int.get;
 
 		c.begin();
 		t.t = "this value is ignored";
@@ -1634,25 +1634,25 @@ struct Connection
 		t.t = "after savepoint s2";
 		c.update(t.id, t);
 
-		assert(c.findOne!Test(t.id).t == "after savepoint s2");
+		assert(c.findOne!Test(t.id).get.t == "after savepoint s2");
 
 		c.rollback(s2);
-		assert(c.findOne!Test(t.id).t == "before savepoint s2");
+		assert(c.findOne!Test(t.id).get.t == "before savepoint s2");
 
 		c.rollback();
-		assert(c.findOne!Test(t.id).t == "before transaction");
+		assert(c.findOne!Test(t.id).get.t == "before transaction");
 
 		Connection c2 = Connection("host=127.0.0.1 dbname=test user=test");
 		c.begin();
 		t.t = "inside transaction";
 		c.update(t.id, t);
 
-		assert( c.findOne!Test(t.id).t == "inside transaction");
-		assert(c2.findOne!Test(t.id).t == "before transaction");
+		assert( c.findOne!Test(t.id).get.t == "inside transaction");
+		assert(c2.findOne!Test(t.id).get.t == "before transaction");
 
 		c.commit();
-		assert( c.findOne!Test(t.id).t == "inside transaction");
-		assert(c2.findOne!Test(t.id).t == "inside transaction");
+		assert( c.findOne!Test(t.id).get.t == "inside transaction");
+		assert(c2.findOne!Test(t.id).get.t == "inside transaction");
 
 		c.exec("DROP TABLE transaction_test");
 		c2.close();

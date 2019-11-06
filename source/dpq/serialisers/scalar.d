@@ -38,7 +38,7 @@ struct ScalarSerialiser
 
 		return RT(nativeToBigEndian(val).dup);
 	}
-	
+
 	static T deserialise(T)(const(ubyte)[] bytes)
 	{
 		enforceSupportedType!T;
@@ -47,7 +47,7 @@ struct ScalarSerialiser
 	}
 
 	static Oid oidForType(T)()
-	{	
+	{
 		enforceSupportedType!T;
 
 		return _supportedTypes[T.stringof].oid;
@@ -56,7 +56,7 @@ struct ScalarSerialiser
 	static string nameForType(T)()
 	{
 		enforceSupportedType!T;
-		
+
 		return _supportedTypes[T.stringof].name;
 	}
 
@@ -100,5 +100,5 @@ unittest
 
 	int a = 123;
 	auto serialised = ScalarSerialiser.serialise(a);
-	assert(ScalarSerialiser.deserialise!int(serialised) == a);
+	assert(ScalarSerialiser.deserialise!int(serialised.get) == a);
 }

@@ -63,7 +63,7 @@ struct ArraySerialiser
 	{
 		// BYTEA uses its own serialiser
 		// strings are arrays, but not handled by this serialiser
-		return 
+		return
 			isArray!T &&
 			!isSomeString!T &&
 			!is(T == ubyte[]) &&
@@ -84,7 +84,7 @@ struct ArraySerialiser
 		alias RT = Nullable!(ubyte[]);
 		ubyte[] result;
 		import std.stdio;
-	
+
 		// ndim
 		result ~= nativeToBigEndian(cast(int) ArrayDimensions!T);
 
@@ -143,7 +143,7 @@ struct ArraySerialiser
 						result ~= nativeToBigEndian(cast(int) -1); // NULL element
 					else
 					{
-						result ~= nativeToBigEndian(cast(int) bs.length);
+						result ~= nativeToBigEndian(cast(int) bs.get.length);
 						result ~= bs;
 					}
 				}
@@ -174,7 +174,7 @@ struct ArraySerialiser
 			dimSizes[i] = bytes.read!int;
 			lowerBounds[i] = bytes.read!int;
 		}
-		
+
 		// I don't know what to do with this.
 		ubyte[] nullBitmap;
 		foreach (i; 0 .. offset)
@@ -193,7 +193,7 @@ struct ArraySerialiser
 					arr.length = dimSizes[dim];
 
 				assert(
-						dimSizes[dim] == arr.length, 
+						dimSizes[dim] == arr.length,
 						"Array sizes do not match, you probably specified an incorrect static array size somewhere.");
 
 				foreach (i; 0 .. dimSizes[dim])
@@ -214,7 +214,7 @@ struct ArraySerialiser
 					int len = bytes.read!int;
 
 					// We're using "global" offset here, because we're reading the array left-to-right
-					inner[i] = fromBytes!FT(bytes[0 .. len], len);
+					inner[i] = fromBytes!FT(bytes[0 .. len], len).get;
 
 					// "Consume" the array
 					bytes = bytes[len .. $];
@@ -270,7 +270,7 @@ struct ArraySerialiser
 	{
 		static if (isSupportedType!T)
 			enum ArrayDimensions = 1 + ArrayDimensions!(ForeachType!T);
-		else 
+		else
 			enum ArrayDimensions = 0;
 	}
 }
@@ -310,14 +310,14 @@ unittest
 
 	auto serialised = ArraySerialiser.serialise(arr);
 	assert(serialised == expected);
-	assert(ArraySerialiser.deserialise!(int[2][2])(serialised) == arr);
+	assert(ArraySerialiser.deserialise!(int[2][2])(serialised.get) == arr);
 
 
 	writeln("	* Empty array");
 
 	int[] emptyScalarArr;
 	serialised = ArraySerialiser.serialise(emptyScalarArr);
-	assert(ArraySerialiser.deserialise!(int[])(serialised) == emptyScalarArr);
+	assert(ArraySerialiser.deserialise!(int[])(serialised.get) == emptyScalarArr);
 
 
 	writeln("	* Array of struct");
@@ -333,7 +333,7 @@ unittest
 
 	Test[] testArr = [Test(1), Test(2)];
 	serialised = ArraySerialiser.serialise(testArr);
-	assert(ArraySerialiser.deserialise!(Test[])(serialised) == testArr);
+	assert(ArraySerialiser.deserialise!(Test[])(serialised.get) == testArr);
 
 	writeln("	* Array of arrays");
 	int[][] twoDArray = [
@@ -343,7 +343,7 @@ unittest
 	];
 
 	serialised = ArraySerialiser.serialise(twoDArray);
-	assert(ArraySerialiser.deserialise!(int[][])(serialised) == twoDArray);
+	assert(ArraySerialiser.deserialise!(int[][])(serialised.get) == twoDArray);
 
 	import std.datetime;
 
@@ -354,9 +354,9 @@ unittest
 	timeArr ~= Clock.currTime + 24.hours;
 
 	serialised = ArraySerialiser.serialise(timeArr);
-	foreach (i, time; ArraySerialiser.deserialise!(SysTime[])(serialised))
+	foreach (i, time; ArraySerialiser.deserialise!(SysTime[])(serialised.get))
 	{
-		// Serialiser only works with ms accuracy, so comparing them directly 
+		// Serialiser only works with ms accuracy, so comparing them directly
 		// won't work in most cases.
 		assert(time.toUnixTime == timeArr[i].toUnixTime);
 	}
@@ -370,7 +370,7 @@ unittest
 	];
 
 	serialised = ArraySerialiser.serialise(stringArr);
-	assert(ArraySerialiser.deserialise!(string[])(serialised) == stringArr);
+	assert(ArraySerialiser.deserialise!(string[])(serialised.get) == stringArr);
 }
 
 // Element Oid => Array Oid map

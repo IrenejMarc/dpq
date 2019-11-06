@@ -55,7 +55,7 @@ struct SysTimeSerialiser
 		return "TIMESTAMP";
 	}
 
-	static void ensureExistence(T)(Connection c) 
+	static void ensureExistence(T)(Connection c)
 	{
 		return;
 	}
@@ -73,5 +73,5 @@ unittest
 	SysTime time = Clock.currTime;
 	auto serialised = SysTimeSerialiser.serialise(time);
 
-	assert(SysTimeSerialiser.deserialise!SysTime(serialised).toUnixTime == time.toUnixTime);
+	assert(SysTimeSerialiser.deserialise!SysTime(serialised.get).toUnixTime == time.toUnixTime);
 }
