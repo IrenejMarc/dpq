@@ -35,7 +35,10 @@ package Nullable!(ubyte[]) toBytes(T)(T val)
 		return Nullable!(ubyte[]).init;
 
 	alias serialiser = SerialiserFor!AT;
-	return Nullable!(ubyte[])(serialiser.serialise(cast(AT) val));
+
+   auto av = (cast(AT)(val));
+   auto x = serialiser.serialise(av);
+	return Nullable!(ubyte[])(x.get);
 }
 
 /*****************************************************************************/
@@ -104,7 +107,7 @@ unittest
 	static assert(is(SerialiserFor!Test1 == CompositeTypeSerialiser));
 	static assert(is(SerialiserFor!(int[][]) == ArraySerialiser));
 	static assert(is(SerialiserFor!(Test1[][]) == ArraySerialiser));
-	
+
 	@serialiser!Test1() struct Test2 {}
 
 	static assert(is(SerialiserFor!Test2 == Test1));
@@ -115,7 +118,7 @@ package T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 {
 	alias AT = RealType!T;
 
-	return T(fromBytes!AT(bytes, len));
+	return T(fromBytes!AT(bytes, len).get);
 }
 
 package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
@@ -132,7 +135,7 @@ package Nullable!T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
 package T fromBytesImpl(T)(const(ubyte)[] bytes, size_t len)
 {
 	alias serialiser = SerialiserFor!T;
-	return Nullable!T(serialiser.deserialise!T(bytes[0 .. len]));
+	return Nullable!T(serialiser.deserialise!T(bytes[0 .. len])).get;
 }
 
 unittest
@@ -204,7 +207,7 @@ template typeOid(T)
 			else static if (is(BT == float))
 				enum typeOid = Type.FLOAT4ARRAY;
 			else static if (is(BT == string))
-				enum typeOid = Type.TEXTARRAY;			
+				enum typeOid = Type.TEXTARRAY;
 			else static if (is(BT == byte) || is (BT == ubyte))
 				enum typeOid = Type.BYTEA;
 			else
@@ -236,7 +239,7 @@ template typeOid(T)
 			/**
 				Since unsigned types are not supported by PostgreSQL, we use signed
 				types for them. Transfer and representation in D will still work correctly,
-				but SELECTing them in the psql console, or as a string might result in 
+				but SELECTing them in the psql console, or as a string might result in
 				a negative number.
 
 				It is recommended not to use unsigned types in structures, that will
@@ -291,9 +294,9 @@ unittest
 	Must return a valid, unescaped name for the type, as recognised by PostgreSQL
 
 	 - static void ensureExistence(T)(Connection conn);
-	Must ensure the type exists and can be used in the DB, can simply return 
+	Must ensure the type exists and can be used in the DB, can simply return
 	if no work is needed.
-	Must not throw or otherwise fail unless type creation failed, in case the type 
+	Must not throw or otherwise fail unless type creation failed, in case the type
 	does not yet exist, it should be silently created.
 
 	Example:

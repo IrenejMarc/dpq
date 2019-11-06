@@ -65,5 +65,5 @@ unittest
 
 	string str = "1234567890qwertyuiop[]asdfghjkl;'zxcvbnm,./ščžèéêëē";
 	auto serialised = StringSerialiser.serialise(str);
-	assert(str == StringSerialiser.deserialise!string(serialised));
+	assert(str == StringSerialiser.deserialise!string(serialised.get));
 }

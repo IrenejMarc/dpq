@@ -154,11 +154,11 @@ struct Value
 			return;
 		}
 
-		_valueBytes = toBytes(val);
+		_valueBytes = toBytes(val).get;
 		_size = _valueBytes.length.to!int;
 		_type = cast(Type) oidFor!T;
 	}
-	
+
 	void opAssign(Value val)
 	{
 		_valueBytes = val._valueBytes;
@@ -175,7 +175,7 @@ struct Value
 	{
 		return _type;
 	}
-	
+
 	@property const(ubyte)* valuePointer()
 	{
 		return _valueBytes.ptr;
