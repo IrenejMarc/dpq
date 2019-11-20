@@ -12,8 +12,8 @@ dfmt_split_operator_at_line_end = false
 
 trim_trailing_whitespace = true
 end_of_line = lf
-indent_size = 4
+indent_size = 3
 indent_style = space
 insert_final_newline = true
 max_line_length = 180
-tab_width = 3
+tab_width = 0

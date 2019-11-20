@@ -23,11 +23,13 @@ struct SysTimeSerialiser
    static Nullable!(ubyte[]) serialise(T)(T val)
    {
       import std.datetime.timezone : UTC;
-      static assert (isSupportedType!T, "'%s' is not supported by SysTimeSerialiser".format(T.stringof));
+
+      static assert(isSupportedType!T, "'%s' is not supported by SysTimeSerialiser".format(T.stringof));
 
       alias RT = Nullable!(ubyte[]);
 
-      if (isAnyNull(val)) {
+      if (isAnyNull(val))
+      {
          return RT.init;
       }
 
@@ -36,11 +38,12 @@ struct SysTimeSerialiser
       return RT(nativeToBigEndian(diff / 10).dup);
    }
 
-   static T deserialise(T)(const (ubyte)[] bytes)
+   static T deserialise(T)(const(ubyte)[] bytes)
    {
-      static assert (isSupportedType!T, "'%s' is not supported by SysTimeSerialiser".format(T.stringof));
+      static assert(isSupportedType!T, "'%s' is not supported by SysTimeSerialiser".format(T.stringof));
 
       import std.datetime.timezone : UTC;
+
       return SysTime(fromBytes!long(bytes, long.sizeof) * 10 + SysTime(POSTGRES_EPOCH, UTC()).stdTime);
    }
 
