@@ -1,0 +1,19 @@
+[*.d]
+dfmt_align_switch_statements = false
+# allman, otbs, or stroustrup
+#dfmt_brace_style = otbs
+#dfmt_brace_style = stroustrup
+dfmt_outdent_attributes = true
+dfmt_outdent_labels = true
+dfmt_soft_max_line_length = 120
+dfmt_space_after_cast = false
+dfmt_space_after_keywords = true
+dfmt_split_operator_at_line_end = false
+
+trim_trailing_whitespace = true
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+max_line_length = 180
+tab_width = 4
