@@ -22,17 +22,17 @@ struct SysTimeSerialiser
 
    static Nullable!(ubyte[]) serialise(T)(T val)
    {
-      static assert (
-            isSupportedType!T,
-            "'%s' is not supported by SysTimeSerialiser".format(T.stringof));
+      import std.datetime.timezone : UTC;
+      static assert (isSupportedType!T, "'%s' is not supported by SysTimeSerialiser".format(T.stringof));
 
       alias RT = Nullable!(ubyte[]);
 
-      if (isAnyNull(val))
+      if (isAnyNull(val)) {
          return RT.init;
+      }
 
       // stdTime is in hnsecs, psql wants microsecs
-      long diff = val.stdTime - SysTime(POSTGRES_EPOCH).stdTime;
+      long diff = val.stdTime - SysTime(POSTGRES_EPOCH, UTC()).stdTime;
       return RT(nativeToBigEndian(diff / 10).dup);
    }
 
