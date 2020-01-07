@@ -699,8 +699,9 @@ struct Connection
 	{
 		QueryBuilder qb;
 		qb.select(AttributeList!T)
-			.from(relationName!T)
-			.where(filter);
+			.from(relationName!T);
+		if (filter != "")
+			qb.where(filter);
 
 		auto q = qb.query(this);
 
