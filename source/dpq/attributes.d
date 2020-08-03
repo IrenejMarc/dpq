@@ -10,7 +10,7 @@ import dpq.meta;
 
 version(unittest) import std.stdio;
 
-/** 
+/**
 	@relation attribute -- specifies the relation/type name to be used
 	for Connection's ORM functions. If none is set, dpq will
 	default to the structure's name in lower_snake_case.
@@ -131,7 +131,7 @@ alias ignore = IgnoreAttribute;
 
 /**
 	Specifies that the member/column should have an index created on it.
-	If unique is set, it well be a unique index. 
+	If unique is set, it well be a unique index.
  */
 package struct IndexAttribute
 {
@@ -151,7 +151,7 @@ package struct IndexAttribute
 }
 
 /**
-	Specifies that the member is a foriegn key, ensureSchema will create a FK 
+	Specifies that the member is a foriegn key, ensureSchema will create a FK
 	constraint as well as an index for it. Finds the referenced table's PK
 	by itself.
  */
@@ -246,7 +246,7 @@ unittest
 
 /**
 	Attribute name for the given type, can be specified with @attribute.
-	If @attribute is not specified, the member's name will just be 
+	If @attribute is not specified, the member's name will just be
 	lower_snake_cased and returned.
  */
 template attributeName(alias R)
@@ -362,7 +362,7 @@ unittest
 		@PK int id;
 		string a;
 	}
-	
+
 	static assert(isPK!(Test, "id"));
 	static assert(!isPK!(Test, "a"));
 }
@@ -402,9 +402,11 @@ template AttributeList2(
 			enum AttributeList2 = AttributeList2!(T, prefix, asPrefix, ignorePK, fields[1 .. $]);
 		else
 		{
+         pragma(msg, fields[0]);
 			enum attrName = attributeName!(mixin("T." ~ fields[0]));
-			enum AttributeList2 = 
-					[Column(prefix ~ attrName, asPrefix ~ attrName)] ~ 
+         pragma(msg, attrName);
+			enum AttributeList2 =
+					[Column(prefix ~ attrName, asPrefix ~ attrName)] ~
 					AttributeList2!(
 							T,
 							prefix,
@@ -483,18 +485,23 @@ template filterSerialisableMembers(T, fields...)
 	else
 	{
 		enum m = fields[0];
+      pragma(msg, ">>", m);
+      pragma(msg, "   >>",isRWPlainField!(T, m), isRWField!(T, m));
 		static if (isRWPlainField!(T, m) || isRWField!(T, m))
 		{
-			static if (!hasUDA!(mixin("T." ~ m), IgnoreAttribute))
+			static if (!hasUDA!(mixin("T." ~ m), IgnoreAttribute)) {
+            pragma(msg, "   NO UDA ", TypeTuple!m);
 				alias filterSerialisableMembers = TypeTuple!(
 						TypeTuple!(m),
 						filterSerialisableMembers!(T, fields[1 .. $]));
-			else
+         } else {
+            pragma(msg, "   SI UDA");
 				alias filterSerialisableMembers = filterSerialisableMembers!(T, fields[1 .. $]);
+         }
 		}
-		else 
+		else
 			alias filterSerialisableMembers = filterSerialisableMembers!(T, fields[1 .. $]);
-	} 
+	}
 }
 
 
@@ -515,9 +522,9 @@ template filterSerialisableMembers(T, fields...)
 
 template isRWPlainField(T, string M)
 {
-	static if (!isRWField!(T, M)) 
+	static if (!isRWField!(T, M))
 		enum isRWPlainField = false;
-	else 
+	else
 		enum isRWPlainField = __traits(compiles, *(&__traits(getMember, Tgen!T(), M)) = *(&__traits(getMember, Tgen!T(), M)));
 }
 
@@ -530,7 +537,7 @@ template isRWField(T, string M)
 	import std.traits;
 	import std.typetuple;
 
-	static void testAssign()() 
+	static void testAssign()()
 	{
 		T t = void;
 		__traits(getMember, t, M) = __traits(getMember, t, M);
@@ -570,9 +577,9 @@ template isPublicMember(T, string M)
 {
 	import std.algorithm, std.typetuple : TypeTuple;
 
-	static if (!__traits(compiles, TypeTuple!(__traits(getMember, T, M)))) 
+	static if (!__traits(compiles, TypeTuple!(__traits(getMember, T, M))))
 		enum isPublicMember = false;
-	else 
+	else
 	{
 		alias MEM = TypeTuple!(__traits(getMember, T, M));
 		enum isPublicMember = __traits(getProtection, MEM).among("public", "export");
@@ -583,7 +590,7 @@ template isNonStaticMember(T, string M)
 {
 	import std.typetuple;
 	import std.traits;
-	
+
 	alias MF = TypeTuple!(__traits(getMember, T, M));
 
 	static if (M.length == 0)

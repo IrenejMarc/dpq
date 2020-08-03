@@ -212,6 +212,9 @@ struct Connection
 		auto pValues = params.paramValues;
 		auto pLengths = params.paramLengths;
 		auto pFormats = params.paramFormats;
+      import std.stdio;
+      writefln("cmd:%s values:%(%s, %)", command, params);
+
 
 		if (async)
 		{
@@ -1084,7 +1087,10 @@ struct Connection
 	bool insert(T)(T val, bool async = false)
 		if(!isArray!T)
 	{
+      import std.stdio;
+
 		QueryBuilder qb;
+      writefln("relationName:%s attribute:%s ", relationName!T, AttributeList!(T, true, true));
 		qb.insert(relationName!T, AttributeList!(T, true, true));
 
 		qb.addValues!T(val);
