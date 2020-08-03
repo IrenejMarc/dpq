@@ -40,7 +40,7 @@ private struct FilterBuilder
 {
 	private string[][] _filters;
 
-	ref FilterBuilder and(string filter)
+	ref FilterBuilder and(string filter) return
 	{
 		if (_filters.length == 0)
 			_filters.length++;
@@ -50,7 +50,7 @@ private struct FilterBuilder
 		return this;
 	}
 
-	ref FilterBuilder or()
+	ref FilterBuilder or() return
 	{
 		_filters ~= [];
 
@@ -79,7 +79,7 @@ private struct FilterBuilder
 
 	Most method names are synonimous with the same keyword in SQL, but their order
 	does not matter.
-	
+
 	All of the methods can be chained.
 
 	Examples:
@@ -87,7 +87,7 @@ private struct FilterBuilder
 	auto qb = QueryBuilder()
 			.select("id")
 			.from!User
-			.where("posts > {posts}") // placeholders can be used 
+			.where("posts > {posts}") // placeholders can be used
 			.order("posts", Order.desc)
 			.limit(5);
 
@@ -190,7 +190,7 @@ struct QueryBuilder
 	/**
 		Sets the builder's type to SELECT, a variadic array of column names to select
 	 */
-	ref QueryBuilder select(string[] cols...)
+	ref QueryBuilder select(string[] cols...) return
 	{
 		_columns = cols;
 		_type = QueryType.select;
@@ -201,7 +201,7 @@ struct QueryBuilder
 		Same as above, except it accepts a variadic array of Column type. Mostly
 		used internally.
 	 */
-	ref QueryBuilder select(Column[] cols...)
+	ref QueryBuilder select(Column[] cols...) return
 	{
 		_type = QueryType.select;
 		_columns = [];
@@ -250,7 +250,7 @@ struct QueryBuilder
 	/**
 		Sets the builder's FROM value to the given string.
 	 */
-	ref QueryBuilder from(string from)
+	ref QueryBuilder from(string from) return
 	{
 		assert(
 				_type == QueryType.select || _type == QueryType.delete_,
@@ -274,7 +274,7 @@ struct QueryBuilder
 	{
 		writeln("\t\t * from");
 		QueryBuilder qb;
-		
+
 		qb.from("sometable");
 		assert(qb._table == "sometable");
 
@@ -286,7 +286,7 @@ struct QueryBuilder
 	/**
 		Generates a placeholder that should be unique every time.
 
-		This is required because we might filter by the same column twice (e.g. 
+		This is required because we might filter by the same column twice (e.g.
 		where(["id": 1])).or.where(["id": 2]), in which case the second value for
 		ID would overwrite the first one.
 	 */
@@ -362,7 +362,7 @@ struct QueryBuilder
 			// Which will produce a filter like "... WHERE (id = $1) OR (id = $2)"
 		--------------------
 	 */
-	@property ref QueryBuilder or()
+	ref QueryBuilder or() return
 	{
 		_filters.or();
 
@@ -385,7 +385,7 @@ struct QueryBuilder
 	/**
 		Sets the ORDER part of the query. Accepts a column name and an Order value.
 	 */
-	ref QueryBuilder order(string col, Order order)
+	ref QueryBuilder order(string col, Order order) return
 	{
 		assert(_type == QueryType.select, "QueryBuilder.order() can only be used for SELECT queries.");
 		_orderBy ~= col;
@@ -409,11 +409,11 @@ struct QueryBuilder
 		assert(qb._orderBy[1] == "some_other_col");
 		assert(qb._orders[1] == Order.desc);
 	}
-	
+
 	/**
 		Sets the LIMIT in the query. Only for SELECT queries, obviously.
 	 */
-	ref QueryBuilder limit(int limit)
+	ref QueryBuilder limit(int limit) return
 	{
 		assert(_type == QueryType.select, "QueryBuilder.limit() can only be used for SELECT queries.");
 
@@ -431,7 +431,7 @@ struct QueryBuilder
 	}
 
 	/// OFFSET for queries
-	ref QueryBuilder offset(int offset)
+	ref QueryBuilder offset(int offset) return
 	{
 		assert(_type == QueryType.select, "QueryBuilder.offset() can only be used for SELECT queries.");
 		_offset = offset;
@@ -448,13 +448,13 @@ struct QueryBuilder
 	}
 
 	// UPDATE methods
-	ref QueryBuilder update(string table)
+	ref QueryBuilder update(string table) return
 	{
 		_table = table;
 		_type = QueryType.update;
 		return this;
 	}
-	
+
 	ref QueryBuilder update(T)()
 	{
 		return update(relationName!T);
@@ -493,7 +493,7 @@ struct QueryBuilder
 		return this;
 	}
 
-	ref QueryBuilder set(string set)
+	ref QueryBuilder set(string set) return
 	{
 		_set ~= set;
 
@@ -527,9 +527,9 @@ struct QueryBuilder
 		assert(qb._set.length == 4);
 		assert(qb._set[3] == str);
 	}
-	
+
 	// INSERT methods
-	ref QueryBuilder insert(string table, string[] cols...)
+	ref QueryBuilder insert(string table, string[] cols...) return
 	{
 		_table = table;
 		_columns = cols;
@@ -538,7 +538,7 @@ struct QueryBuilder
 	}
 
 
-	ref QueryBuilder insert(string table, Column[] cols...)
+	ref QueryBuilder insert(string table, Column[] cols...) return
 	{
 		import std.array;
 		return insert(table, array(cols.map!(c => c.column)));
@@ -575,7 +575,7 @@ struct QueryBuilder
 		return this;
 	}
 
-	ref QueryBuilder values(Value[] vals)
+	ref QueryBuilder values(Value[] vals) return
 	{
 		assert(_type == QueryType.insert, "QueryBuilder.values() can only be used on INSERT queries");
 
@@ -602,13 +602,13 @@ struct QueryBuilder
 		assert(qb._indexParams == [Value(1), Value(2), Value(3), Value(4), Value(5)]);
 	}
 
-	ref QueryBuilder remove()
+	ref QueryBuilder remove() return
 	{
 		_type = QueryType.delete_;
 		return this;
 	}
 
-	ref QueryBuilder remove(string table)
+	ref QueryBuilder remove(string table) return
 	{
 		from(table);
 		return remove();
@@ -619,7 +619,7 @@ struct QueryBuilder
 		return remove(relationName!T);
 	}
 
-	ref QueryBuilder returning(string[] ret...)
+	ref QueryBuilder returning(string[] ret...) return
 	{
 		foreach (r; ret)
 			_returning ~= r;
@@ -751,7 +751,7 @@ struct QueryBuilder
 	private string insertCommand()
 	{
 		int index = 0;
-		
+
 		string params = "(";
 		foreach (i, v; _indexParams)
 		{
@@ -762,7 +762,7 @@ struct QueryBuilder
 				params ~= "),(";
 		}
 		params ~= ")";
-		
+
 		string str = "INSERT INTO \"%s\" (%s) VALUES %s".format(
 				_table,
 				_columns.join(","),
@@ -928,7 +928,7 @@ struct QueryBuilder
 
 		return this;
 	}
-	
+
 	unittest
 	{
 		writeln("\t * addParams");
