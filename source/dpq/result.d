@@ -16,10 +16,11 @@ import dpq.value;
 import dpq.exception;
 import dpq.smartptr;
 
-version(unittest)
+version (unittest)
 {
    import std.stdio;
    import dpq.connection;
+
    Connection c;
 }
 
@@ -44,10 +45,10 @@ struct Result
          case PGRES_EMPTY_QUERY:
          case PGRES_BAD_RESPONSE:
          case PGRES_FATAL_ERROR:
-         {
-            string err = PQresultErrorMessage(res).fromStringz.to!string;
-            throw new DPQException(status.to!string ~ " " ~ err);
-         }
+            {
+               string err = PQresultErrorMessage(res).fromStringz.to!string;
+               throw new DPQException(status.to!string ~ " " ~ err);
+            }
          default:
             break;
       }
@@ -102,9 +103,10 @@ struct Result
          @serial @PK int id;
          int n;
       }
+
       c.ensureSchema!Test;
 
-      foreach(i; 0 .. 100)
+      foreach (i; 0 .. 100)
          c.insert(Test(i, i));
 
       auto r = c.exec("SELECT 1 FROM test_query");
@@ -146,11 +148,11 @@ struct Result
       if (PQgetisnull(_result, row, col))
          return Value(null);
 
-      const(ubyte)* data = cast(ubyte *) PQgetvalue(_result, row, col);
+      const(ubyte)* data = cast(ubyte*)PQgetvalue(_result, row, col);
       int len = PQgetlength(_result, row, col);
       Oid oid = PQftype(_result, col);
 
-      return Value(data, len, cast(Type) oid);
+      return Value(data, len, cast(Type)oid);
    }
 
    unittest
@@ -183,8 +185,7 @@ struct Result
       return PQfname(_result, col).fromStringz.to!string;
    }
 
-   deprecated("Use columnName instead")
-      alias colName = columnName;
+   deprecated("Use columnName instead") alias colName = columnName;
 
    unittest
    {
@@ -263,8 +264,7 @@ struct Result
       return Row(row, this);
    }
 
-   T opCast(T)()
-         if (is(T == bool))
+   T opCast(T)() if (is(T == bool))
    {
       return !isNull();
    }
