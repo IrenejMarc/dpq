@@ -9,3 +9,4 @@ dub.userprefs
 __test__library__
 *.kate-swp
 *.swp
+dpq-test-library

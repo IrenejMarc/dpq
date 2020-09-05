@@ -74,6 +74,7 @@ struct Connection
 
 	unittest
 	{
+		writeln(" * Try to connect host=127.0.0.1 dbname=test user=test");
 		c = Connection("host=127.0.0.1 dbname=test user=test");
 		writeln(" * Database connection with connection string");
 		assert(c.status == CONNECTION_OK);
@@ -212,9 +213,6 @@ struct Connection
 		auto pValues = params.paramValues;
 		auto pLengths = params.paramLengths;
 		auto pFormats = params.paramFormats;
-      import std.stdio;
-      writefln("cmd:%s values:%(%s, %)", command, params);
-
 
 		if (async)
 		{
@@ -1087,12 +1085,9 @@ struct Connection
 	bool insert(T)(T val, bool async = false)
 		if(!isArray!T)
 	{
-      import std.stdio;
 
 		QueryBuilder qb;
-      writefln("relationName:%s attribute:%s ", relationName!T, AttributeList!(T, true, true));
 		qb.insert(relationName!T, AttributeList!(T, true, true));
-
 		qb.addValues!T(val);
 
 		if (async)

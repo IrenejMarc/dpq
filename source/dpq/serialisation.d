@@ -110,7 +110,7 @@ unittest
 
 	@serialiser!Test1() struct Test2 {}
 
-	static assert(is(SerialiserFor!Test2 == Test1));
+	static assert(is(SerialiserFor!(Test2) == Test1));
 }
 
 package T fromBytes(T)(const(ubyte)[] bytes, size_t len = 0)
@@ -148,7 +148,8 @@ unittest
 
 	int x = 123;
 
-	const (ubyte)[] bs = nativeToBigEndian(x);
+	//const (ubyte)[] bs = nativeToBigEndian(x);
+	auto bs = nativeToBigEndian(x);
 	assert(fromBytes!int(bs, x.sizeof) == x);
 
 	x = -555;

@@ -32,12 +32,8 @@ struct SysTimeSerialiser
       {
          return RT.init;
       }
-      import std.stdio;
-
-
       // stdTime is in hnsecs, psql wants microsecs
       long diff = val.stdTime - SysTime(POSTGRES_EPOCH, UTC()).stdTime;
-      writefln("val: %s, diff: %d", val, diff);
       return RT(nativeToBigEndian(diff / 10).dup);
    }
 
