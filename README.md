@@ -15,12 +15,18 @@ dpq wraps the libpq library and aims to provide a simple and modern way to acces
  - (Basic) async query support (will be improved in the future)
  - (Basic) prepared statement support (will be improved in the future)
 
- 
+
 ## Documentation
 Documentation is in the code itself, though pretty lacking currently.
 
 Unit tests might provide some useful usage examples too.
- 
+
+## Test
+Before running  tests configure the database (only once):
+```
+$ psql -U postgres < prepare_test_db.sql
+```
+
 ## Some notes:
  - If a wrong type is specified to `Value`'s `as`, the results are undefined, but most likely a `RangeError` or garbage.
  - Using QueryBuilder, when specifying columns, make sure they are not reserverd SQL keywords, they will not be escaped automatically (wrap keywords in `" "`)
@@ -103,7 +109,7 @@ void main()
 			 The opIndex will accept either a textual index, looking up the column
 			 by its name, or the column's numerical index, starting with a zero.
 
-			 A Value object will be returned by this. 
+			 A Value object will be returned by this.
 			 This value, can hold a NULL value, or the actual data. Checking for NULL
 			 can be done with its isNull property.
 		 */
@@ -114,8 +120,8 @@ void main()
 			 to most dpq's functions directly.
 
 			 To obtain a value usable in D, you must call the Value's as method, which
-			 accepts one template param, indicating the type to return. The returned 
-			 type will ALWAYS be an instance of Nullable, meaning you must check for 
+			 accepts one template param, indicating the type to return. The returned
+			 type will ALWAYS be an instance of Nullable, meaning you must check for
 			 the NULL value unless you're sure it cannot happen.
 		 */
 		string stringParam = strVal.as!string;
@@ -135,7 +141,7 @@ void main()
 		 */
 		auto literalString = row[2].as!string;
 
-		/* 
+		/*
 			 And now the returned value can be checked for null with Nullable's
 			 isNull method.
 		 */
@@ -166,8 +172,8 @@ void main()
 		 update existing records and insert or remove new ones.
 	 */
 
-	
-	/* 
+
+	/*
 		 Specifying the relation name can be done with the @relation attribute.
 		 If no name is specified, though you generally probably should do that,
 		 the structure's name will be lower_snake_cased and used.
@@ -188,15 +194,15 @@ void main()
 			 is @PKey. Use whichever one you prefer and deem more understandable.
 		 */
 		@serial @PK int id;
-		
+
 		/*
-			 Setting an index on the column is as simple as specifying @index for 
-			 the member. @uniqueIndex is also provided, creating a, you guessed it, 
+			 Setting an index on the column is as simple as specifying @index for
+			 the member. @uniqueIndex is also provided, creating a, you guessed it,
 			 unique index.
 		 */
 		@index int posts;
 		@uniqueIndex string username;
-		
+
 
 		/*
 			 Arrays are supported, and are sent as PostgreSQL arrays.
@@ -230,7 +236,7 @@ void main()
 			 Both arrays of built-in types and custom structures are supported, but
 			 sadly, I am running out of ideas for user fields.
 
-			 Arrays can only have up to 6 dimensions, which is a limitation of 
+			 Arrays can only have up to 6 dimensions, which is a limitation of
 			 PostgreSQL, and can-not be jagged. Arrays of Nullable values
 			 are supported, but not, however, arrays of Nullable arrays. This is
 			 again, a limitation of PostgreSQL, not dpq.
@@ -240,7 +246,7 @@ void main()
 		/*
 			 Another thing supported by dpq out-of-the-box is SysTime, which will
 			 get stored in the DB as TIMESTAMP in UTC.
-			 Keep in mind, that PostgreSQL only supportes up to millisecond 
+			 Keep in mind, that PostgreSQL only supportes up to millisecond
 			 accuracy, while D supports it up to hnsecs.
 		 */
 		SysTime registrationTime;
@@ -252,7 +258,7 @@ void main()
 	struct Post
 	{
 		/*
-			 When wanting to work with BIGINT serial values, use @serial8, and 
+			 When wanting to work with BIGINT serial values, use @serial8, and
 			 make sure to use long as the member's type.
 		 */
 		@serial8 @PK long id;
@@ -294,8 +300,8 @@ void main()
 			 The method accepts a single template parameter, indicating the structure
 			 to fetch, and a normal parameter, indicating the value of the FK to filter
 			 by.
-			 
-			 findOne will return a Nullable instance of the requested type. A NULL 
+
+			 findOne will return a Nullable instance of the requested type. A NULL
 			 value in this case means no rows were selected by the query.
 
 			 Once again, in case you forgot by now, compound PKs are, unfortunately,
@@ -373,7 +379,7 @@ void main()
 			 The second version accepts the value of the PK to filter by, and
 			 an associative array of strings mapping to Value objects.
 			 It sets the columns of the provided to the values they map to.
-			 
+
 			 Keep in mind that there is no way to set values relatively to their
 			 current value using this way, which might cause data races in concurrent
 			 applications.
@@ -398,7 +404,7 @@ void main()
 			 dpq also provides async versions for most of the methods mentioned above,
 			 for which the results can be obtained by using Connection's
 			 lastResult, allResults and nextResult method.
-			 
+
 			 More info is available in the Connection's and Query's files inline docs.
 		 */
 		db.removeAsync!User(1);
