@@ -233,5 +233,5 @@ unittest
 	assert(deserialised.a == t.a);
 	assert(deserialised.b == t.b);
 	assert(deserialised.test2.c == t.test2.c);
-	assert(deserialised.ntest2.isNull == t.ntest2.isNull);
+   assert(deserialised.ntest2.isNull == t.ntest2.isNull);
 }

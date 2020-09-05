@@ -148,7 +148,6 @@ unittest
 
 	int x = 123;
 
-	//const (ubyte)[] bs = nativeToBigEndian(x);
 	auto bs = nativeToBigEndian(x);
 	assert(fromBytes!int(bs, x.sizeof) == x);
 
@@ -263,13 +262,13 @@ template typeOid(T)
 unittest
 {
 	import std.stdio;
-	writeln("\t * typeOid");
+	writeln("\t * oidFor");
 
-	static assert(typeOid!int == Type.INT4, "int");
-	static assert(typeOid!string == Type.TEXT, "string");
-	static assert(typeOid!(int[]) == Type.INT4ARRAY, "int[]");
-	static assert(typeOid!(int[][]) == Type.INT4ARRAY, "int[][]");
-	static assert(typeOid!(ubyte[]) == Type.BYTEA, "ubyte[]");
+	static assert(oidFor!int == Type.INT4, "int");
+	static assert(oidFor!string == Type.TEXT, "string");
+	assert(oidFor!(int[]) == Type.INT4ARRAY, "int[]");
+	assert(oidFor!(int[][]) == Type.INT4ARRAY, "int[][]");
+	assert(oidFor!(ubyte[]) == Type.BYTEA, "ubyte[]");
 }
 
 /**
