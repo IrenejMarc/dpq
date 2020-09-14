@@ -1602,6 +1602,16 @@ struct Connection
    {
       return prepared(name);
    }
+
+   private class Savepoint
+   {
+      string name;
+
+      this(string name)
+      {
+         this.name = name;
+      }
+   }
 }
 
 /**
@@ -1637,16 +1647,6 @@ T deserialise(T)(Row r, string prefix = "")
       }
    }
    return res;
-}
-
-class Savepoint
-{
-   string name;
-
-   this(string name)
-   {
-      this.name = name;
-   }
 }
 
 /**
