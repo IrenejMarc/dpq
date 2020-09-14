@@ -1,12 +1,26 @@
+# dub files
 .dub
-.directory
 dub.selections.json
+dub.userprefs
+
+# dqp unittest executable
+dpq-test-library
+
+# libs
 *.a
 *.so
 *.lib
 *.dll
-dub.userprefs
-__test__library__
-*.kate-swp
+
+# vim swap files
 *.swp
-dpq-test-library
+
+# Kate swap files
+*.kate-swp
+
+# Eclipse project files
+.project
+
+# other
+.directory
+__test__library__
