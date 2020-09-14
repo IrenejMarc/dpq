@@ -112,7 +112,7 @@ struct Query
    /**
       A setter for the connection.
 
-      THe connection MUST be set before executing the query, but it is a lot more
+      The connection MUST be set before executing the query, but it is a lot more
       handy to simply use the constructor that takes the Connection instead of
       using this.
     */
