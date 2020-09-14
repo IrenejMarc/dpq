@@ -1680,8 +1680,6 @@ Connection* dpqDefaultConnection()
 
 /**
  * dpq's default global connection.
- *
- * The main reason If no connection is specified for Query
  */
 package Connection* _dpqConnection;
 
