@@ -9,7 +9,6 @@ import dpq.result;
 version(unittest)
 {
    import std.stdio;
-   private Connection c;
 }
 
 /**
@@ -54,10 +53,10 @@ struct Query
     */
    this(string command, Value[] params = [])
    {
-      if (_dpqLastConnection == null)
+      if (dpqDefaultConnection() == null)
          throw new DPQException("Query: No established connection was found and none was provided.");
 
-      _connection = _dpqLastConnection;
+      _connection = dpqDefaultConnection();
       _command = command;
       _params = params;
    }
@@ -86,7 +85,7 @@ struct Query
    {
       writeln(" * Query");
 
-      c = Connection("host=127.0.0.1 dbname=test user=test");
+      dpqConnect("host=127.0.0.1 dbname=test user=test");
 
       writeln("\t * this()");
       Query q;
@@ -96,7 +95,7 @@ struct Query
       writeln("\t * this(command, params[])");
       string cmd = "some command";
       q = Query(cmd);
-      assert(q._connection != null, `not null 2`);
+      assert(q._connection == dpqDefaultConnection(), `Default connection error`);
       assert(q._command == cmd, `cmd`);
       assert(q._params == [], `empty arr`);
 
@@ -106,7 +105,7 @@ struct Query
       assert(q._connection == &c2);
 
       q = Query(cmd);
-      assert(q._connection == &c2);
+      assert(q._connection == dpqDefaultConnection());
    }
 
    /**
@@ -242,7 +241,7 @@ struct Query
 
       auto c = Connection("host=127.0.0.1 dbname=test user=test");
 
-      auto q = Query("SELECT 1::INT");
+      auto q = Query(c, "SELECT 1::INT");
 
       auto r = q.run();
       assert(r.rows == 1);

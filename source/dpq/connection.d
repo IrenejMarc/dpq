@@ -66,8 +66,6 @@ struct Connection
 
       if (status != CONNECTION_OK)
          throw new DPQException(errorMessage);
-
-      _dpqLastConnection = &this;
    }
 
    unittest
@@ -1651,5 +1649,52 @@ class Savepoint
    }
 }
 
-/// Hold the last created connection, not to be used outside the library
-package Connection* _dpqLastConnection;
+/**
+ * Creates global dpq connection.
+ *
+ * If no connection is provided to Query, this newly created connection will be used instead.
+ * If the function is called consiquently the previously created connection will be closed.
+ *
+ * Params:
+ *     connString = connection string
+ */
+void dpqConnect(string connString)
+{
+	if (_dpqConnection !is null)
+	{
+		_dpqConnection.close();
+		_dpqConnection.destroy();
+	}
+
+	Connection* connection = new Connection(connString);
+	_dpqConnection = connection;
+}
+
+/**
+ * Returns the default global connection.
+ */
+Connection* dpqDefaultConnection()
+{
+	return _dpqConnection;
+}
+
+/**
+ * dpq's default global connection.
+ *
+ * The main reason If no connection is specified for Query
+ */
+package Connection* _dpqConnection;
+
+unittest
+{
+	writeln("\t * dpqDefaultConnection");
+
+	assert (dpqDefaultConnection() is null);
+
+	dpqConnect("host=127.0.0.1 dbname=test user=test");
+	assert (dpqDefaultConnection() !is null);
+
+	auto oldConnectionPtr = dpqDefaultConnection();
+	dpqConnect("host=127.0.0.1 dbname=test user=test");
+	assert (dpqDefaultConnection() !is oldConnectionPtr);
+}
