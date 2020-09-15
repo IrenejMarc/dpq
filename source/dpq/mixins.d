@@ -31,12 +31,12 @@ mixin template RelationMixin()
    alias Type = typeof(this);
    alias ProxyT = RelationProxy!Type;
 
-   import dpq.connection : _dpqLastConnection;
+   import dpq.connection : dpqDefaultConnection;
    import std.typecons : Nullable;
 
    @property static ProxyT relationProxy()
    {
-      return ProxyT(*_dpqLastConnection);
+      return ProxyT(*dpqDefaultConnection);
    }
 
    static ProxyT where(U)(U[string] filters)
