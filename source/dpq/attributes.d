@@ -15,10 +15,7 @@ version(unittest) import std.stdio;
    for Connection's ORM functions. If none is set, dpq will
    default to the structure's name in lower_snake_case.
  */
-RelationAttribute relation(string name)
-{
-   return RelationAttribute(name);
-}
+alias relation = RelationAttribute;
 
 package struct RelationAttribute
 {
@@ -221,11 +218,18 @@ template relationName(alias R)
 {
    static if (hasUDA!(R, RelationAttribute))
    {
-      enum rName = getUDAs!(R, RelationAttribute)[0].name;
-      static if (rName.length == 0)
+      // check if @relation is a type
+      static if (is(getUDAs!(R, RelationAttribute)[0]))
          enum relationName = SnakeCase!(R.stringof);
-      else
-         enum relationName = rName;
+      else // if @relation("name") is a value
+      {
+         enum rName = getUDAs!(R, RelationAttribute)[0].name;
+
+         static if (rName.length == 0)
+            enum relationName = SnakeCase!(R.stringof);
+         else
+            enum relationName = rName;
+      }
    }
    else
       enum relationName = SnakeCase!(R.stringof);
@@ -237,10 +241,12 @@ unittest
 
    struct Test {}
    struct someThing {}
+   @relation struct TypeTest {}
    @relation("some_random_name") struct Test2 {}
 
    static assert(relationName!Test == "test");
    static assert(relationName!someThing == "some_thing");
+   static assert(relationName!TypeTest == "type_test");
    static assert(relationName!Test2 == "some_random_name");
 }
 
