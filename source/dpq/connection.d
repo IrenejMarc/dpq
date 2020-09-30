@@ -1660,14 +1660,14 @@ T deserialise(T)(Row r, string prefix = "")
  */
 void dpqConnect(string connString)
 {
-	if (_dpqConnection !is null)
-	{
-		_dpqConnection.close();
-		_dpqConnection.destroy();
-	}
+   if (_dpqConnection !is null)
+   {
+      _dpqConnection.close();
+      _dpqConnection.destroy();
+   }
 
-	Connection* connection = new Connection(connString);
-	_dpqConnection = connection;
+   Connection* connection = new Connection(connString);
+   _dpqConnection = connection;
 }
 
 /**
@@ -1675,7 +1675,7 @@ void dpqConnect(string connString)
  */
 Connection* dpqDefaultConnection()
 {
-	return _dpqConnection;
+   return _dpqConnection;
 }
 
 /**
@@ -1685,14 +1685,14 @@ package Connection* _dpqConnection;
 
 unittest
 {
-	writeln("\t * dpqDefaultConnection");
+   writeln("\t * dpqDefaultConnection");
 
-	assert (dpqDefaultConnection() is null);
+   assert (dpqDefaultConnection() is null);
 
-	dpqConnect("host=127.0.0.1 dbname=test user=test");
-	assert (dpqDefaultConnection() !is null);
+   dpqConnect("host=127.0.0.1 dbname=test user=test");
+   assert (dpqDefaultConnection() !is null);
 
-	auto oldConnectionPtr = dpqDefaultConnection();
-	dpqConnect("host=127.0.0.1 dbname=test user=test");
-	assert (dpqDefaultConnection() !is oldConnectionPtr);
+   auto oldConnectionPtr = dpqDefaultConnection();
+   dpqConnect("host=127.0.0.1 dbname=test user=test");
+   assert (dpqDefaultConnection() !is oldConnectionPtr);
 }
