@@ -1,22 +1,21 @@
 ///
 module dpq.serialisers.composite;
 
-import dpq.serialisation;
-import dpq.meta;
 import dpq.attributes;
-import dpq.exception;
-import dpq.value;
 import dpq.connection;
-
-import std.string : format, join;
-import std.typecons : Nullable, Typedef;
-import std.traits;
-import std.array : Appender;
-import std.bitmanip;
-import std.conv : to;
-import std.datetime : SysTime;
+import dpq.exception;
+import dpq.meta;
+import dpq.serialisation;
 
 import libpq.libpq;
+
+import std.bitmanip : nativeToBigEndian, read;
+import std.conv : to;
+import std.datetime : SysTime;
+import std.string : format, join;
+import std.traits : hasUDA, isInstanceOf;
+import std.typecons : Nullable, Typedef;
+
 /**
 	The default serialiser for any composite type (structs and classes)
 

@@ -1,18 +1,17 @@
 ///
 module dpq.querybuilder;
 
-import dpq.value;
-import dpq.query;
-import dpq.connection;
 import dpq.attributes;
 import dpq.column;
-
-import std.typecons;
-import std.string;
+import dpq.connection;
+import dpq.query;
+import dpq.value;
 
 import std.algorithm : map, sum;
 import std.conv : to;
 import std.range : chunks;
+import std.string : format, join, replace;
+import std.typecons : Nullable;
 
 version (unittest) import std.stdio;
 

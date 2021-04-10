@@ -7,8 +7,8 @@
 module dpq.prepared;
 
 import libpq.libpq;
+
 import dpq.connection;
-import dpq.result;
 
 struct PreparedStatement
 {

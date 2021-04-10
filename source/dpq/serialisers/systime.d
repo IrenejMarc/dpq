@@ -1,15 +1,15 @@
 ///
 module dpq.serialisers.systime;
 
+import dpq.connection : Connection;
+import dpq.serialisation;
+import dpq.value : Type;
+
+import libpq.libpq : Oid;
+
+import std.bitmanip : nativeToBigEndian;
 import std.datetime : SysTime, DateTime;
 import std.typecons : Nullable;
-import std.bitmanip;
-import core.time;
-import dpq.meta;
-import dpq.serialisation;
-import dpq.connection : Connection;
-import libpq.libpq : Oid;
-import dpq.value : Type;
 
 enum POSTGRES_EPOCH = DateTime(2000, 1, 1);
 

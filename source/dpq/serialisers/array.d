@@ -1,12 +1,6 @@
 ///
 module dpq.serialisers.array;
 
-import std.typecons : Nullable;
-import std.bitmanip;
-import std.traits;
-import std.conv : to;
-import std.string : format;
-
 import dpq.meta;
 import dpq.serialisation;
 import dpq.exception;
@@ -15,7 +9,11 @@ import dpq.connection : Connection;
 
 import libpq.libpq;
 
-
+import std.bitmanip : nativeToBigEndian, read;
+import std.conv : to;
+import std.string : format;
+import std.traits : ForeachType, isArray, isDynamicArray, isSomeString;
+import std.typecons : Nullable;
 
 
 /*-------------------------------------------------------------------------

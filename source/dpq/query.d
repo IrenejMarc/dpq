@@ -2,9 +2,9 @@
 module dpq.query;
 
 import dpq.connection;
-import dpq.value;
 import dpq.exception;
 import dpq.result;
+import dpq.value;
 
 version(unittest)
 {

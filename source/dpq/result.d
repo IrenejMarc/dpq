@@ -1,20 +1,15 @@
 ///
 module dpq.result;
 
-import std.conv : to;
-import libpq.libpq;
-
-import dpq.serialisation;
-
-import std.stdio;
-import std.string;
-import std.typecons;
-import std.datetime;
-import std.traits;
-
-import dpq.value;
 import dpq.exception;
 import dpq.smartptr;
+import dpq.value;
+
+import libpq.libpq;
+
+import std.conv : to;
+import std.datetime : Duration;
+import std.string : format, fromStringz, toStringz;
 
 version (unittest)
 {

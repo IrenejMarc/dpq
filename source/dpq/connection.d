@@ -3,24 +3,25 @@ module dpq.connection;
 
 import libpq.libpq;
 
-import dpq.exception;
-import dpq.result;
-import dpq.value;
 import dpq.attributes;
-import dpq.querybuilder;
+import dpq.exception;
 import dpq.meta;
 import dpq.prepared;
-import dpq.smartptr;
+import dpq.query;
+import dpq.querybuilder;
+import dpq.result;
 import dpq.serialisation;
+import dpq.smartptr;
+import dpq.value;
 
 import dpq.serialisers.array;
 import dpq.serialisers.composite;
 
-import std.string;
-import libpq.libpq;
 import std.conv : to;
-import std.traits;
-import std.typecons;
+import std.range : isInputRange;
+import std.string : format, fromStringz, join, toStringz;
+import std.traits : hasUDA, isArray, FunctionTypeOf, isInstanceOf, getUDAs;
+import std.typecons : Nullable;
 
 version (unittest)
 {

@@ -1,16 +1,15 @@
 ///
 module dpq.serialisers.scalar;
 
-import std.traits;
-import std.bitmanip;
-import std.typecons;
-import std.string : format;
-
 import dpq.serialisation;
 import dpq.value : Type;
 import dpq.connection : Connection;
 
 import libpq.libpq;
+
+import std.bitmanip : nativeToBigEndian, read;
+import std.string : format;
+import std.typecons : Nullable;
 
 struct ScalarSerialiser
 {
