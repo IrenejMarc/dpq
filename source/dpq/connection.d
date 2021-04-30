@@ -463,7 +463,7 @@ struct Connection
          {
             exec(cmd);
          }
-         catch (Throwable)
+         catch (DPQException e)
       {
       } // Horrible, I know, but this just means the constraint/index already exists
    }
