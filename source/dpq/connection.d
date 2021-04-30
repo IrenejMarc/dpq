@@ -387,14 +387,14 @@ struct Connection
                   escapeIdentifier(uda.relation), escapeIdentifier(uda.pkey));
 
             // Also create an index on the foreign key
-            additionalQueries ~= "CREATE INDEX %s ON %s (%s)".format(escapeIdentifier("%s_%s_fk_index".format(relName,
+            additionalQueries ~= "CREATE INDEX IF NOT EXISTS %s ON %s (%s)".format(escapeIdentifier("%s_%s_fk_index".format(relName,
                   attrName)), escRelName, escAttrName);
          }
          else static if (hasUDA!(mixin(member), IndexAttribute))
          {
             enum uda = getUDAs!(mixin(member), IndexAttribute)[0];
 
-            additionalQueries ~= "CREATE%sINDEX %s ON %s (%s)".format(uda.unique ? " UNIQUE " : " ",
+            additionalQueries ~= "CREATE%sINDEX IF NOT EXISTS %s ON %s (%s)".format(uda.unique ? " UNIQUE " : " ",
                   escapeIdentifier("%s_%s_fk_index".format(relName, attrName)), escRelName, escAttrName);
          }
 
