@@ -53,7 +53,7 @@ struct Connection
          connString = connection string
 
       See Also:
-         http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-CONNSTRING
+         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
    */
    this(string connString)
    {
@@ -894,7 +894,7 @@ struct Connection
       Params:
          id = value of the relation's PK to filter by
          updates = the structure that will provide values for the UPDATE
-         asnyc = whether the query should be sent async
+         async = whether the query should be sent async
 
       Examples:
       ------------------
@@ -1453,27 +1453,23 @@ struct Connection
       assert(r[0][0].as!int == 1);
    }
 
-   /**
-      Begins a transaction block.
-   */
+   /** Begins a transaction block. */
    void begin()
    {
       Query(this, "BEGIN").run();
    }
 
-   /**
-      Commits current transaction
-   */
+   /** Commits the current transaction. */
    void commit()
    {
       Query(this, "COMMIT").run();
    }
 
    /**
-      Creates savepoint in the current transaction block.
+      Creates a savepoint in the current transaction block.
 
       Params:
-         name = name of created savepoint
+         name = the name of the created savepoint
 
       Returns: created Savepoint.
    */
@@ -1487,7 +1483,7 @@ struct Connection
    }
 
    /**
-      Destroys savepoint in the current transaction block.
+      Destroys a savepoint in the current transaction block.
 
       Params:
          s = savepoint to destroy
@@ -1499,10 +1495,10 @@ struct Connection
    }
 
    /**
-      Rollback the current transaction to savepoint.
+      Rollback the current transaction to a given savepoint.
 
       Params:
-         s = savepoint to rollback to. If savepoint s is null or no savepoint is specified then transaction
+         s = savepoint to rollback to. If the savepoint s is null or no savepoint is specified then the transaction
          will be rolled back to the begining.
    */
    void rollback(Savepoint s = null)

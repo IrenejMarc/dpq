@@ -45,7 +45,7 @@ template IsValidRelation(T)
       // provides where, find, findBy, etc on the User struct
       mixin RelationMixin;
 
-      @PK @serial int id'
+      @PK @serial int id;
       string username;
    }
 
