@@ -799,7 +799,7 @@ struct Connection
       int nUpdates = c.update!Test("n = $1", "n = $2", 5, 123);
       assert(nUpdates == 1, `nUpdates == 1`);
 
-      t = c.findOneBy!Test("n", 123);
+      t = c.findOneBy!Test("n", 123).get;
       assert(t.n == 123, `t.n == 123`);
 
       writeln("\t\t * async");
@@ -952,7 +952,7 @@ struct Connection
       t.n = 2;
       c.update!Test(1, t);
 
-      t = c.findOne!Test(1);
+      t = c.findOne!Test(1).get;
       assert(t.n == 2);
 
       t.n = 3;
@@ -1138,7 +1138,7 @@ struct Connection
 
       auto res = c.nextResult();
       assert(res.rows == 1);
-      t2 = c.findOneBy!Test("n", 123);
+      t2 = c.findOneBy!Test("n", 123).get;
       assert(t.n2.isNull);
       assert(t2.n2.isNull);
 

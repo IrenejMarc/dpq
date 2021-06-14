@@ -86,7 +86,7 @@ struct CompositeTypeSerialiser
 			{
 				// The element length and data itself
 				data ~= nativeToBigEndian(bytes.get.length.to!int);
-				data ~= bytes;
+				data ~= bytes.get;
 			}
 		}
 

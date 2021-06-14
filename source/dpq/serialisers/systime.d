@@ -43,7 +43,7 @@ struct SysTimeSerialiser
 
       import std.datetime.timezone : UTC;
 
-      return SysTime(fromBytes!long(bytes, long.sizeof) * 10 + SysTime(POSTGRES_EPOCH, UTC()).stdTime);
+      return SysTime(fromBytes!long(bytes, long.sizeof).get * 10 + SysTime(POSTGRES_EPOCH, UTC()).stdTime);
    }
 
    static Oid oidForType(T)()

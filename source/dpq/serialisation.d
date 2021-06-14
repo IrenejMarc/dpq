@@ -36,9 +36,12 @@ package Nullable!(ubyte[]) toBytes(T)(T val)
 
    alias serialiser = SerialiserFor!AT;
 
-   auto av = (cast(AT)(val));
-   auto x = serialiser.serialise(av);
-   return Nullable!(ubyte[])(x.get);
+   static if (isInstanceOf!(Nullable, T))
+      auto av = val.get;
+   else
+      auto av = val;
+
+   return serialiser.serialise(cast(AT) av);
 }
 
 /*****************************************************************************/
