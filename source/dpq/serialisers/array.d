@@ -144,7 +144,7 @@ struct ArraySerialiser
 					else
 					{
 						result ~= nativeToBigEndian(cast(int) bs.get.length);
-						result ~= bs;
+						result ~= bs.get;
 					}
 				}
 			}

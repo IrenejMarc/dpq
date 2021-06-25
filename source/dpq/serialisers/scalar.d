@@ -21,7 +21,7 @@ struct ScalarSerialiser
 
 	static void enforceSupportedType(T)()
 	{
-		assert(
+		static assert(
 				isSupportedType!T,
 				"'%s' is not supported by ScalarSerialiser".format(T.stringof));
 	}
@@ -36,7 +36,8 @@ struct ScalarSerialiser
 		if (isAnyNull(val))
 			return RT.init;
 
-		return RT(nativeToBigEndian(val).dup);
+		auto bytes = nativeToBigEndian(val);
+		return RT(bytes.dup);
 	}
 
 	static T deserialise(T)(const(ubyte)[] bytes)
