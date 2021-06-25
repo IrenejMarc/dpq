@@ -1638,7 +1638,7 @@ T deserialise(T)(Row r, string prefix = "")
       {
          auto x = r[prefix ~ n].as!MType;
          if (!x.isNull)
-            __traits(getMember, res, m) = cast(OType)x.get;
+            __traits(getMember, res, m) = x.get.to!OType;
       }
       catch (DPQException e)
       {
