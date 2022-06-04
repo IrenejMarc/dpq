@@ -462,7 +462,7 @@ struct Connection
          {
             exec(cmd);
          }
-         catch
+         catch (Throwable)
       {
       } // Horrible, I know, but this just means the constraint/index already exists
    }
