@@ -381,7 +381,7 @@ struct RelationProxy(T)
 
       alias pkMem = Alias!(__traits(getMember, record, pk));
       auto result = qb.query(_connection).run();
-      __traits(getMember, record, pk) = result[0][pkAttr].as!(typeof(pkMem));
+      __traits(getMember, record, pk) = result[0][pkAttr].as!(typeof(pkMem)).get;
 
       return record;
    }
@@ -433,7 +433,7 @@ struct RelationProxy(T)
          .select("count(%s)".format(col));
 
       auto result = qb.query(_connection).run();
-      return result[0][0].as!long;
+      return result[0][0].as!long().get;
    }
 
    /**
