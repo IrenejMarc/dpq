@@ -73,6 +73,12 @@ PGTypeAttribute type(string type)
    return PGTypeAttribute("SERIAL4");
 }
 
+/// SHORTCUT for @type("BIGSERIAL")
+@property PGTypeAttribute bigserial()
+{
+   return PGTypeAttribute("BIGSERIAL");
+}
+
 /// SHORTCUT for @type("SERIAL8")
 @property PGTypeAttribute serial8()
 {
