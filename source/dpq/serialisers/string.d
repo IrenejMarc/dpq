@@ -3,12 +3,14 @@ module dpq.serialisers.string;
 
 import dpq.serialisation;
 import dpq.connection : Connection;
-import std.string : representation;
-import std.traits;
-import std.conv : to;
-import std.typecons : Nullable;
-import libpq.libpq : Oid;
 import dpq.value : Type;
+
+import libpq.libpq : Oid;
+
+import std.conv : to;
+import std.string : representation;
+import std.traits : isSomeString;
+import std.typecons : Nullable;
 
 struct StringSerialiser
 {

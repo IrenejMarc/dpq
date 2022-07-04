@@ -6,8 +6,10 @@ import dpq.querybuilder;
 import dpq.value : Value;
 
 import std.algorithm : map;
-import std.array;
+import std.array : array;
 import std.meta : Alias;
+import std.range : isInputRange;
+import std.traits : isArray;
 import std.typecons : Nullable;
 
 /**
@@ -43,7 +45,7 @@ template IsValidRelation(T)
       // provides where, find, findBy, etc on the User struct
       mixin RelationMixin;
 
-      @PK @serial int id'
+      @PK @serial int id;
       string username;
    }
 

@@ -1,12 +1,11 @@
 ///
 module dpq.attributes;
 
-import std.traits;
-import std.typetuple;
-import std.typecons;
-
 import dpq.column;
 import dpq.meta;
+
+import std.traits : getUDAs, hasUDA;
+import std.typetuple : TypeTuple;
 
 version(unittest) import std.stdio;
 

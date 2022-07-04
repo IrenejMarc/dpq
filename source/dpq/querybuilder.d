@@ -1,17 +1,17 @@
 ///
 module dpq.querybuilder;
 
-import dpq.value;
-import dpq.query;
-import dpq.connection;
 import dpq.attributes;
 import dpq.column;
-
-import std.typecons;
-import std.string;
+import dpq.connection;
+import dpq.query;
+import dpq.value;
 
 import std.algorithm : map, sum;
 import std.conv : to;
+import std.range : chunks;
+import std.string : format, join, replace;
+import std.typecons : Nullable;
 
 version (unittest) import std.stdio;
 
@@ -752,21 +752,13 @@ struct QueryBuilder
    {
       int index = 0;
 
-      string params = "(";
-      foreach (i, v; _indexParams)
-      {
-         params ~= "$%d".format(i + 1);
-         if ((i + 1) % _columns.length)
-            params ~= ", ";
-         else if ( (i + 1) < _indexParams.length)
-            params ~= "),(";
-      }
-      params ~= ")";
-
       string str = "INSERT INTO \"%s\" (%s) VALUES %s".format(
             _table,
             _columns.join(","),
-            params
+            _indexParams.chunks(_columns.length).map!(
+               v => "(%s)".format(
+                  v.map!(p => "$%d".format(++index)).join(", ")
+               )).join(", ")
             );
 
       if (_returning.length > 0)
@@ -788,7 +780,7 @@ struct QueryBuilder
          .returning("id");
 
       string str = qb.command();
-      assert(str == `INSERT INTO "table" (col) VALUES ($1),($2) RETURNING id`);
+      assert(str == `INSERT INTO "table" (col) VALUES ($1), ($2) RETURNING id`);
    }
 
    private string updateCommand()

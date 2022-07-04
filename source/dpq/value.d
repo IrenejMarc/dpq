@@ -1,23 +1,15 @@
 ///
 module dpq.value;
 
-import dpq.result;
-import dpq.exception;
 import dpq.meta;
-import dpq.attributes;
-import dpq.connection;
 import dpq.serialisation;
 
-//import derelict.pq.pq;
 import libpq.libpq;
 
 import std.algorithm : map;
-import std.array;
+import std.array : array;
 import std.conv : to;
-import std.typecons : Nullable, TypedefType;
-import std.bitmanip;
-import std.traits;
-import std.datetime : SysTime, DateTime;
+import std.typecons : Nullable;
 
 version(unittest) import std.stdio;
 

@@ -1,11 +1,8 @@
 ///
 module dpq.meta;
 
-import dpq.attributes;
-
 import std.traits;
 import std.typecons : Nullable;
-import std.datetime : SysTime;
 
 version(unittest) import std.stdio;
 

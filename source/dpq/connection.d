@@ -3,24 +3,25 @@ module dpq.connection;
 
 import libpq.libpq;
 
-import dpq.exception;
-import dpq.result;
-import dpq.value;
 import dpq.attributes;
-import dpq.querybuilder;
+import dpq.exception;
 import dpq.meta;
 import dpq.prepared;
-import dpq.smartptr;
+import dpq.query;
+import dpq.querybuilder;
+import dpq.result;
 import dpq.serialisation;
+import dpq.smartptr;
+import dpq.value;
 
 import dpq.serialisers.array;
 import dpq.serialisers.composite;
 
-import std.string;
-import libpq.libpq;
 import std.conv : to;
-import std.traits;
-import std.typecons;
+import std.range : isInputRange;
+import std.string : format, fromStringz, join, toStringz;
+import std.traits : hasUDA, isArray, FunctionTypeOf, isInstanceOf, getUDAs;
+import std.typecons : Nullable;
 
 version (unittest)
 {
@@ -52,7 +53,7 @@ struct Connection
          connString = connection string
 
       See Also:
-         http://www.postgresql.org/docs/9.3/static/libpq-connect.html#LIBPQ-CONNSTRING
+         https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
    */
    this(string connString)
    {
@@ -386,14 +387,14 @@ struct Connection
                   escapeIdentifier(uda.relation), escapeIdentifier(uda.pkey));
 
             // Also create an index on the foreign key
-            additionalQueries ~= "CREATE INDEX %s ON %s (%s)".format(escapeIdentifier("%s_%s_fk_index".format(relName,
+            additionalQueries ~= "CREATE INDEX IF NOT EXISTS %s ON %s (%s)".format(escapeIdentifier("%s_%s_fk_index".format(relName,
                   attrName)), escRelName, escAttrName);
          }
          else static if (hasUDA!(mixin(member), IndexAttribute))
          {
             enum uda = getUDAs!(mixin(member), IndexAttribute)[0];
 
-            additionalQueries ~= "CREATE%sINDEX %s ON %s (%s)".format(uda.unique ? " UNIQUE " : " ",
+            additionalQueries ~= "CREATE%sINDEX IF NOT EXISTS %s ON %s (%s)".format(uda.unique ? " UNIQUE " : " ",
                   escapeIdentifier("%s_%s_fk_index".format(relName, attrName)), escRelName, escAttrName);
          }
 
@@ -462,7 +463,7 @@ struct Connection
          {
             exec(cmd);
          }
-         catch (Throwable)
+         catch (DPQException e)
       {
       } // Horrible, I know, but this just means the constraint/index already exists
    }
@@ -893,7 +894,7 @@ struct Connection
       Params:
          id = value of the relation's PK to filter by
          updates = the structure that will provide values for the UPDATE
-         asnyc = whether the query should be sent async
+         async = whether the query should be sent async
 
       Examples:
       ------------------
@@ -1099,47 +1100,36 @@ struct Connection
 
       c.ensureSchema!Test;
 
-      Test t;
-      t.n = 1;
-      t.n2 = 2;
-      t.foo.bar = 2;
+      auto t1 = Test(1, Nullable!int(2), Inner(3));
 
-      auto r = c.insert(t);
+      auto r = c.insert(t1);
       assert(r == true);
 
-      auto r2 = c.insertR(t, "n");
+      auto r2 = c.insertR(t1, "n");
       assert(r2.rows == 1);
-      assert(r2[0][0].as!int == t.n);
+      assert(r2[0][0].as!int == t1.n);
 
-      Test t2 = c.findOneBy!Test("n", 1).get;
-      assert(t2 == t, t.to!string ~ " != " ~ t2.to!string);
+      auto t2 = c.findOneBy!Test("n", 1).get;
+      assert(t2 == t1, t2.to!string ~ " != " ~ t1.to!string);
 
-      Test[] t_arr;
-      t_arr ~= Test.init;
-      t_arr[0].n = 1;
-      t_arr[0].n2 = 2;
-      t_arr[0].foo.bar = 3;
-      t_arr ~= Test.init;
-      t_arr[1].n = 4;
-      t_arr[1].n2 = 5;
-      t_arr[1].foo.bar = 6;
+      t2.n = 4;
 
-      auto r3 = c.insert(t_arr);
+      auto r3 = c.insert([t1, t2]);
       assert(r3 == 2);
 
-      auto r4 = c.insertR(t_arr, "n");
-      assert(r4[0][0].as!int == t_arr[0].n);
-      assert(r4[1][0].as!int == t_arr[1].n);
+      auto r4 = c.insertR([t1, t2], "n");
+      assert(r4[0][0].as!int == t1.n);
+      assert(r4[1][0].as!int == t2.n);
 
       writeln("\t\t * async");
-      t.n = 123;
-      t.n2.nullify;
-      c.insertAsync(t);
+      t1.n = 123;
+      t1.n2.nullify;
+      c.insertAsync(t1);
 
       auto res = c.nextResult();
       assert(res.rows == 1);
       t2 = c.findOneBy!Test("n", 123).get;
-      assert(t.n2.isNull);
+      assert(t1.n2.isNull);
       assert(t2.n2.isNull);
 
       c.exec("DROP TABLE insert_test");
@@ -1463,79 +1453,57 @@ struct Connection
       assert(r[0][0].as!int == 1);
    }
 
-   /**
-      Begins a transaction block.
-   */
+   /** Begins a transaction block. */
    void begin()
    {
-      import dpq.query;
-
-      auto q = Query(this, "BEGIN");
-      q.run();
+      Query(this, "BEGIN").run();
    }
 
-   /**
-      Commits current transaction
-   */
+   /** Commits the current transaction. */
    void commit()
    {
-      import dpq.query;
-
-      auto q = Query(this, "COMMIT");
-      q.run();
+      Query(this, "COMMIT").run();
    }
 
    /**
-      Creates savepoint in the current transaction block.
+      Creates a savepoint in the current transaction block.
 
       Params:
-         name = name of created savepoint
+         name = the name of the created savepoint
 
       Returns: created Savepoint.
    */
    Savepoint savepoint(string name)
    {
-      import dpq.query;
-
       Savepoint s = new Savepoint(name);
-      auto q = Query(this, "SAVEPOINT " ~ s.name);
+      auto q = Query(this, "SAVEPOINT %s".format(s.name));
       q.run();
 
       return s;
    }
 
    /**
-      Destroys savepoint in the current transaction block.
+      Destroys a savepoint in the current transaction block.
 
       Params:
          s = savepoint to destroy
    */
    void releaseSavepoint(Savepoint s)
    {
-      import dpq.query;
-
-      auto q = Query(this, "RELEASE SAVEPOINT " ~ s.name);
+      auto q = Query(this, "RELEASE SAVEPOINT %s".format(s.name));
       q.run();
    }
 
    /**
-      Rollback the current transaction to savepoint.
+      Rollback the current transaction to a given savepoint.
 
       Params:
-         s = savepoint to rollback to. If savepoint s is null or no savepoint is specified then transaction
+         s = savepoint to rollback to. If the savepoint s is null or no savepoint is specified then the transaction
          will be rolled back to the begining.
    */
    void rollback(Savepoint s = null)
    {
-      import dpq.query;
-
-      auto q = Query(this);
-
-      if (s is null)
-         q.command = "ROLLBACK";
-      else
-         q.command = "ROLLBACK TO " ~ s.name;
-
+      auto q = Query(this, "ROLLBACK %s".format(s is null ? "" : "TO " ~ s.name));
       q.run();
    }
 
