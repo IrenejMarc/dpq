@@ -21,11 +21,78 @@ Documentation is in the code itself, though pretty lacking currently.
 
 Unit tests might provide some useful usage examples too.
 
+## Build
+For `dpq` to run, `libpq` needs to be installed. For the installation tips refer
+to one of the sections bellow:
+
+<details>
+  <summary><b>Linux</b></summary>
+  
+  You can install it using your distro package manager, e.g. on Debian using
+  `apt-get`:
+  ```bash
+  sudo apt-get install libpq-dev
+  ```
+</details>
+
+<details>
+  <summary><b>Windows</b></summary>
+  
+  On Windows libpq should come with your PostgreSQL installation.
+  If you are using PostgreSQL version other than 15, edit `dub.sdl` to change
+  the library path for your PostgreSQL version:
+  ```
+  lflags "-LIBPATH:C:/Program Files/PostgreSQL/<VERSION>/lib/" platform="windows"
+  ```
+</details>
+
 ## Test
-Before running  tests configure the database (only once):
-```
-$ psql -U postgres < prepare_test_db.sql
-```
+Before running tests configure the database (only once):
+
+<details>
+  <summary><b>Linux</b></summary>
+
+  1. Run the script to create a database to run tests on and a user that `dqp`
+  will use:
+  ```bash
+  psql -U postgres < prepare_test_db.sql
+  ```
+  
+  2. Edit your pg_hba.cong so user `test` could connect to the test database.
+  On Linux by default this file path is `/etc/postgresql/<version>/main/pg_hba.conf`.
+  Add a line allowing `test` user to connect to the `test` database without a
+  password, so it looks like this:
+  ```
+  # IPv4 local connections:
+  host    test            test            127.0.0.1/32            trust
+  host    all             all             127.0.0.1/32            scram-sha-256
+  ```
+</details>
+
+<details>
+  <summary><b>Windows</b></summary>
+  
+  1. Run a powershell command to create a database to run tests on and a user
+  that `dqp` will use:
+  ```powershell
+  Get-Content .\prepare_test_db.sql | psql -U postgres -h 127.0.0.1
+  ```
+  
+  2. Edit your pg_hba.cong so user `test` could connect to the test database.
+  On Windows it is located in PostgreSQL `data` directory. You can find it by
+  checking `PGDATA` variable value in the `C:\Program Files\PostgreSQL\15\pg_env.bat`
+  file, e.g.:
+  ```bat
+  @SET PGDATA=D:\PostgreSQL\data
+  ```
+  Add a line allowing `test` user to connect to the `test` database without a
+  password, so it looks like this:
+  ```
+  # IPv4 local connections:
+  host    test            test            127.0.0.1/32            trust
+  host    all             all             127.0.0.1/32            scram-sha-256
+  ```
+</details>
 
 ## Some notes:
  - If a wrong type is specified to `Value`'s `as`, the results are undefined, but most likely a `RangeError` or garbage.

@@ -1,6 +1,6 @@
-drop database if exists test;
-drop USER if exists test;
+DROP DATABASE IF EXISTS test;
+DROP USER IF EXISTS test;
 CREATE USER test;
-CREATE DATABASE test;
-GRANT ALL PRIVILEGES ON DATABASE test to test;
-
+CREATE DATABASE test OWNER test;
+GRANT ALL PRIVILEGES ON DATABASE test TO test;
+COMMENT ON DATABASE test IS 'test db for dqp library';

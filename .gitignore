@@ -5,6 +5,8 @@ dub.userprefs
 
 # dqp unittest executable
 dpq-test-library
+dpq-test-library.exe
+dpq-test-library.pdb
 
 # libs
 *.a
