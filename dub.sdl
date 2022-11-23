@@ -4,4 +4,14 @@ copyright "Copyright © 2016, Irenej Marc"
 authors "Irenej"
 targetType "library"
 license "MIT"
-libs "pq"
+targetPath "bin"
+libs "pq" platform="linux"
+libs "libpq" platform="windows"
+lflags "-LIBPATH:C:/Program Files/PostgreSQL/15/lib/" platform="windows"
+copyFiles \
+	"C:/Program Files/PostgreSQL/15/lib/libpq.dll" \
+	"C:/Program Files/PostgreSQL/15/bin/libintl-9.dll" \
+	"C:/Program Files/PostgreSQL/15/bin/libssl-3-x64.dll" \
+	"C:/Program Files/PostgreSQL/15/bin/libcrypto-3-x64.dll" \
+	"C:/Program Files/PostgreSQL/15/bin/libwinpthread-1.dll" \
+	"C:/Program Files/PostgreSQL/15/bin/libiconv-2.dll" platform="windows"
