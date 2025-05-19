@@ -410,13 +410,3 @@ void main()
 		db.removeAsync!User(1);
 }
 ```
-
-## A word from the author
-I believe this above example covers most use cases for dpq.
-
-If you have any questions, I can be contacted on Twitter with the handle
-@IrenejMarc. I'll always be glad to help out.
-
-If you have any ideas how dpq could be improved, or find a missing feature
-or a bug, don't be scared to create an issue, I love feedback.
-
